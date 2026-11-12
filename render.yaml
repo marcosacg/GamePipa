@@ -1,0 +1,9 @@
+# Exemplo para hospedar o servidor online no Render (render.com).
+# O endereço que o Render der (https://SEU-APP.onrender.com) vira, no jogo,
+# wss://SEU-APP.onrender.com/ws  -> use no gerar-versao-portal.bat
+services:
+  - type: web
+    name: rabiola
+    runtime: node
+    buildCommand: npm run vendor
+    startCommand: npm start

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rabiola — Exportar Assets</title>
+<style>
+  @font-face { font-family: 'Bungee'; src: url('../vendor/fonts/bungee-400.woff2') format('woff2'); }
+  @font-face { font-family: 'Nunito'; src: url('../vendor/fonts/nunito-700.woff2') format('woff2'); font-weight: 700; }
+  html, body { margin: 0; background: #1d1a3a; font-family: Nunito, sans-serif; color: #fff8ea; }
+  body > canvas { display: none; } /* o renderer da cena não é usado aqui */
+  main { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-family: Bungee, sans-serif; color: #ffd166; font-weight: 400; margin: 0 0 6px; }
+  p { line-height: 1.5; opacity: .9; }
+  button { font: 400 18px Bungee, sans-serif; border: 0; border-radius: 12px; padding: 12px 22px; background: #ffd166; color: #1b1b1f; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: wait; }
+  #bar { height: 10px; border-radius: 6px; background: rgba(255,255,255,.15); overflow: hidden; margin: 18px 0 8px; }
+  #bar i { display: block; height: 100%; width: 0; background: #2ec4b6; transition: width .2s; }
+  #log { font: 13px/1.6 ui-monospace, Consolas, monospace; background: rgba(0,0,0,.25); border-radius: 10px; padding: 12px; max-height: 50vh; overflow: auto; white-space: pre-wrap; }
+  .bad { color: #ff9a8f; }
+</style>
+</head>
+<body>
+<main>
+  <h1>EXPORTAR ASSETS</h1>
+  <p>Gera a pasta <b>Assets/</b> com os modelos 3D do jogo em <b>.glb</b> (abre no Blender, no Windows “Visualizador 3D”,
+     em <i>gltf-viewer</i> etc.) e as imagens usadas como textura em <b>.png</b>. Os modelos são criados pelo mesmo código do jogo:
+     mudou o visual, é só exportar de novo.</p>
+  <p>Precisa estar rodando pelo <b>iniciar-servidor.bat</b> neste computador (http://localhost:8080).</p>
+  <button id="go">Exportar tudo</button>
+  <div id="bar"><i></i></div>
+  <div id="log"></div>
+</main>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js" } }</script>
+<script type="module">
+import { assetList, textureList } from '../js/models.js';
+import { exportGLB, texturePNG } from '../js/tools/glb.js';
+
+const log = (t, bad) => { const d = document.createElement('div'); d.textContent = t; if (bad) d.className = 'bad'; $log.append(d); $log.scrollTop = 1e9; };
+const $log = document.getElementById('log'), $bar = document.querySelector('#bar i'), $go = document.getElementById('go');
+
+async function save(caminho, bytes) {
+  const r = await fetch('/api/salvar-asset?caminho=' + encodeURIComponent(caminho), { method: 'POST', body: bytes });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+async function exportAll() {
+  $go.disabled = true; $log.textContent = '';
+  const models = assetList(), texs = textureList();
+  const total = models.length + texs.length;
+  let done = 0, fails = 0, bytes = 0;
+  const step = () => { done++; $bar.style.width = (100 * done / total) + '%'; };
+  const index = [];
+  for (const a of models) {
+    try {
+      const obj = a.criar(); obj.name = a.nome;
+      const glb = await exportGLB(obj, { name: a.nome });
+      await save(`${a.pasta}/${a.nome}.glb`, glb);
+      bytes += glb.byteLength; index.push(`| ${a.pasta}/${a.nome}.glb | ${(glb.byteLength / 1024).toFixed(0)} KB |`);
+      log(`✔ ${a.pasta}/${a.nome}.glb  (${(glb.byteLength / 1024).toFixed(0)} KB)`);
+    } catch (e) { fails++; log(`✘ ${a.pasta}/${a.nome}: ${e.message}`, true); }
+    step();
+  }
+  for (const t of texs) {
+    try {
+      const png = await texturePNG(t.img());
+      await save(`${t.pasta}/${t.nome}.png`, png);
+      bytes += png.byteLength; index.push(`| ${t.pasta}/${t.nome}.png | ${(png.byteLength / 1024).toFixed(0)} KB |`);
+      log(`✔ ${t.pasta}/${t.nome}.png`);
+    } catch (e) { fails++; log(`✘ ${t.pasta}/${t.nome}: ${e.message}`, true); }
+    step();
+  }
+  try { await save('lista-de-arquivos.md', new TextEncoder().encode('# Arquivos gerados\n\n| arquivo | tamanho |\n|---|---|\n' + index.join('\n') + '\n')); } catch { }
+  log(fails ? `Terminou com ${fails} erro(s).` : `Pronto! ${done} arquivos, ${(bytes / 1048576).toFixed(1)} MB na pasta Assets/.`, !!fails);
+  $go.disabled = false;
+  window.__exportDone = { done, fails, bytes };
+}
+$go.onclick = exportAll;
+window.__exportAll = exportAll;
+</script>
+</body>
+</html>

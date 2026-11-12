@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rabiola — Vitrine de modelos</title>
+<style>
+  @font-face { font-family: 'Bungee'; src: url('../vendor/fonts/bungee-400.woff2') format('woff2'); }
+  @font-face { font-family: 'Nunito'; src: url('../vendor/fonts/nunito-700.woff2') format('woff2'); font-weight: 700; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1d1a3a; font-family: Nunito, sans-serif; color: #fff8ea; }
+  #bar { position: fixed; left: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 2; }
+  #bar button { border: 0; border-radius: 10px; padding: 8px 14px; font: 700 14px Nunito, sans-serif; background: rgba(20,18,30,.65); color: #fff8ea; cursor: pointer; }
+  #bar button.sel { background: #ffd166; color: #1b1b1f; }
+  #title { position: fixed; right: 16px; top: 12px; font-family: Bungee, sans-serif; font-size: 22px; color: #ffd166; z-index: 2; }
+  #hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); font-size: 13px; opacity: .8; z-index: 2; }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="title">VITRINE</div>
+<div id="hint">arraste para girar · roda do mouse para aproximar</div>
+<script type="importmap">{ "imports": { "three": "../vendor/three/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { scene, camera, renderer, updateSky } from '../js/scene.js';
+import { SHOWCASE } from '../js/models.js';
+
+// chão da vitrine
+const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ color: '#6f9c3d', roughness: 1 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+scene.fog.near = 60; scene.fog.far = 200;
+
+const holder = new THREE.Group(); scene.add(holder);
+let cur = null, yaw = 0, dist = 7, pitch = .18, autoSpin = true;
+const look = new THREE.Vector3(0, 1, 0);
+
+function show(key) {
+  holder.clear();
+  const { items, spacing = 1.2, focusY = 1, dist: d = 7 } = SHOWCASE[key]();
+  items.forEach((o, i) => { o.position.x = (i - (items.length - 1) / 2) * spacing; holder.add(o); });
+  look.set(0, focusY, 0); dist = d;
+  cur = key;
+  document.querySelectorAll('#bar button').forEach(b => b.classList.toggle('sel', b.dataset.k === key));
+}
+for (const key of Object.keys(SHOWCASE)) {
+  const b = document.createElement('button'); b.textContent = key; b.dataset.k = key;
+  b.onclick = () => show(key); document.getElementById('bar').append(b);
+}
+show(new URLSearchParams(location.search).get('ver') || Object.keys(SHOWCASE)[0]);
+window.__show = show;
+
+let drag = null;
+renderer.domElement.addEventListener('pointerdown', e => { drag = [e.clientX, e.clientY]; autoSpin = false; });
+addEventListener('pointerup', () => drag = null);
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  yaw -= (e.clientX - drag[0]) * .008; pitch = Math.max(-.1, Math.min(1.2, pitch + (e.clientY - drag[1]) * .005)); drag = [e.clientX, e.clientY];
+});
+addEventListener('wheel', e => { dist = Math.max(1.5, Math.min(40, dist * (e.deltaY > 0 ? 1.1 : .9))); });
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (autoSpin) yaw += dt * .25;
+  camera.position.set(look.x + Math.sin(yaw) * dist * Math.cos(pitch), look.y + Math.sin(pitch) * dist, look.z + Math.cos(yaw) * dist * Math.cos(pitch));
+  camera.lookAt(look);
+  updateSky(17 * 60, look);
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

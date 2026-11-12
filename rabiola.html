@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1d1a3a">
+<title>Rabiola</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Aviso quando o arquivo é aberto direto (file://): módulos JS precisam de servidor -->
+<div id="fileWarn" class="overlay hidden">
+  <div class="panel">
+    <h2>Quase lá!</h2>
+    <p>Agora o jogo é dividido em vários arquivos e precisa rodar pelo servidor.</p>
+    <p>Dê dois cliques em <b>iniciar-servidor.bat</b> (precisa do <a href="https://nodejs.org" target="_blank" rel="noopener">Node.js</a>) e o jogo abre sozinho em <b>http://localhost:8080</b>.</p>
+  </div>
+</div>
+<script>
+  if (location.protocol === 'file:') document.getElementById('fileWarn').classList.remove('hidden');
+</script>
+
+<!-- ================= MENU ================= -->
+<div id="menu">
+  <div class="menu-card">
+    <h1 class="logo">RABIOLA</h1>
+    <div class="tag">Fim de tarde no campinho de várzea. Pegue a lata, solte linha e domine o céu.</div>
+
+    <nav id="tabs">
+      <button data-tab="jogar" class="sel">Jogar</button>
+      <button data-tab="personagem">Personagem</button>
+      <button data-tab="pipa">Pipa</button>
+    </nav>
+
+    <section id="tab-jogar">
+      <div class="label">Modo</div>
+      <div class="row" id="modeRow">
+        <button class="opt sel" data-mode="livre"><b>Livre</b><small>Sem pressa. Argolas e avoadas valem pontos.</small></button>
+        <button class="opt" data-mode="desafios"><b>Desafios</b><small>6 missões até a mãe chamar pra janta.</small></button>
+        <button class="opt" data-mode="disputa"><b>Disputa</b><small>Enrosque a linha contra a molecada do bairro.</small></button>
+        <button class="opt" data-mode="online"><b>Online</b><small>Crie uma sala e chame a turma.</small></button>
+      </div>
+
+      <div id="onlineBox" class="hidden">
+        <div class="label">Seu apelido</div>
+        <input id="nameIn" maxlength="16" autocomplete="off" spellcheck="false">
+        <div class="label">Seu personagem na sala</div>
+        <div class="row chips" id="quickPresets"></div>
+        <button class="linkbtn" id="toCharBtn">Personalizar peça por peça →</button>
+        <div class="label">Sala</div>
+        <div class="row">
+          <button class="btn" id="createBtn" disabled>Criar sala</button>
+          <input id="codeIn" maxlength="4" placeholder="CÓDIGO" autocomplete="off" spellcheck="false">
+          <button class="btn alt" id="joinBtn" disabled>Entrar</button>
+          <button class="btn alt" id="randomBtn" disabled title="Entra numa sala já criada, escolhida ao acaso">Aleatória</button>
+        </div>
+        <div id="netMsg"></div>
+      </div>
+
+      <div class="label">Opções</div>
+      <div class="row"><button class="chip" id="fxTailBtn">Animação da rabiola presa: desligada</button></div>
+
+      <button id="playBtn" disabled>JOGAR</button>
+      <div id="loadMsg">Carregando física (Ammo.js)…</div>
+
+      <div class="keys">
+        <kbd>A</kbd> <kbd>D</kbd> embicar pra esquerda / direita &nbsp;·&nbsp; <kbd>W</kbd> dar puxada<br>
+        <kbd>S</kbd> dar linha &nbsp;·&nbsp; <kbd>Espaço</kbd> recolher linha<br>
+        <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> andar &nbsp;·&nbsp; <kbd>Shift</kbd> correr &nbsp;·&nbsp; mouse arrasta a câmera, roda dá zoom<br>
+        <kbd>E</kbd> soltar a pipa das costas &nbsp;·&nbsp; <kbd>R</kbd> guardar nas costas &nbsp;·&nbsp; <kbd>Esc</kbd> pausa &nbsp;·&nbsp; <kbd>H</kbd> ajuda
+      </div>
+    </section>
+
+    <section id="tab-personagem" class="hidden">
+      <div class="label">Estilo pronto</div>
+      <div class="row chips" id="presetRow"></div>
+      <div class="label">Pele</div>
+      <div class="row" id="skinRow"></div>
+      <div class="label">Cabelo</div>
+      <div class="row chips" id="hairRow"></div>
+      <div class="label">Chapéu</div>
+      <div class="row chips" id="hatRow"></div>
+      <div class="label">Camisa</div>
+      <div class="row" id="shirtRow"></div>
+      <div class="label">Bermuda</div>
+      <div class="row" id="shortsRow"></div>
+      <div class="label">Carretel</div>
+      <div class="row chips" id="spoolRow"></div>
+      <div class="hint">Arraste na tela para girar o personagem.</div>
+    </section>
+
+    <section id="tab-pipa" class="hidden">
+      <div class="label">Pipa</div>
+      <div id="kiteRow"></div>
+      <div class="label">Estampa</div>
+      <div class="row" id="patRow"></div>
+    </section>
+  </div>
+</div>
+
+<!-- ================= HUD ================= -->
+<div id="hud" class="hidden">
+  <div id="stats" class="panel">
+    <div class="line"><span>Altura</span><span class="big" id="hAlt">0 m</span></div>
+    <div class="line"><span>Linha</span><span id="hLine">0 / 150 m</span></div>
+    <div class="line"><span>Pontos</span><span id="hScore">0</span></div>
+    <div class="line"><span>Estado</span><span id="hState">Voando</span></div>
+    <div id="tensionWrap">
+      <div class="line small"><span>Tensão da linha</span><span id="hTen">0 N</span></div>
+      <div id="tensionBar" class="meter"><i></i></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="clock" class="panel">16:00<small>sol baixando</small></div>
+    <div id="windBox" class="panel">
+      <div id="windArrow"><svg id="windSvg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 L19 14 L13.5 12 L13.5 22 L10.5 22 L10.5 12 L5 14 Z" fill="#fff8ea"/></svg></div>
+      <div id="windTxt"><small>VENTO</small><br><b id="hWind">0</b> km/h <span id="hGust"></span></div>
+    </div>
+
+    <div id="duel" class="panel hidden">
+      <div class="duel-title"><span id="duelTitle">ENROSCADA com</span> <b id="duelName"></b></div>
+      <div id="duelBar"><i></i></div>
+      <div class="duel-legend"><span id="legL">você</span><span id="legR">ele(a)</span></div>
+      <div class="line small"><span>Fôlego</span></div>
+      <div id="staBar" class="meter"><i></i></div>
+      <div class="duel-keys" id="duelKeys"><kbd>W</kbd> puxa · <kbd>S</kbd> dá linha</div>
+    </div>
+    <div id="mission" class="panel">
+      <h3 id="mTitle">Modo livre</h3>
+      <p id="mDesc">Argolas e pipas avoadas valem pontos.</p>
+      <div id="mProg" class="meter"><i></i></div>
+      <div id="mTxt"><span id="mLeft"></span><span id="mRight"></span></div>
+    </div>
+    <div id="board" class="panel hidden">
+      <h3 id="boardTitle">Placar da rodada</h3>
+      <ol id="boardList"></ol>
+      <div class="small">L = laçadas · A = aparadas</div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="launchHint" class="panel hidden"><kbd>E</kbd> soltar a pipa · ande com as setas pra escolher o lugar</div>
+  <div id="respawn" class="hidden">
+    <div id="respawnRing"><span id="respawnNum">2</span></div>
+    <div class="respawn-txt">Nova pipa em…</div>
+  </div>
+  <div id="hint"></div>
+  <div id="help" class="panel hidden">
+    <kbd>A</kbd>/<kbd>D</kbd> embicar · <kbd>W</kbd> puxada · <kbd>S</kbd> dar linha · <kbd>Espaço</kbd> recolher<br>
+    <kbd>↑↓←→</kbd> andar · <kbd>Shift</kbd> correr · <kbd>E</kbd> soltar a pipa · <kbd>R</kbd> guardar nas costas · <kbd>T</kbd> avançar hora (livre)<br>
+    Vento fraco? Corra pra trás (<kbd>↓</kbd>) ou dê puxadas.<br>
+    Disputa: cruze a sua linha na linha do outro. Rabiola presa só vira disputa se as linhas encostarem; quem foi preso afasta a pipa pra rabiola escorregar e soltar.
+  </div>
+</div>
+
+<!-- ================= CONTROLES DE TOQUE (celular) ================= -->
+<div id="touch" class="hidden">
+  <div id="joy"><div id="joyKnob"></div><span>andar</span></div>
+  <div id="tBtns">
+    <button class="tb" data-key="KeyW">PUXA</button>
+    <button class="tb" data-key="KeyS">DAR<br>LINHA</button>
+    <button class="tb" data-key="Space">RECOLHE</button>
+    <button class="tb arrow" data-key="KeyA">◀<small>embica</small></button>
+    <button class="tb arrow" data-key="KeyD">▶<small>embica</small></button>
+  </div>
+  <button id="tLaunch" class="tb hidden" data-tap="KeyE">SOLTAR<br>PIPA</button>
+  <div id="tTop">
+    <button class="tb mini" data-tap="KeyR" title="Guardar a pipa nas costas">↩ costas</button>
+    <button class="tb mini" data-tap="Escape" title="Pausa">❚❚</button>
+  </div>
+</div>
+<div id="rotateHint"><div><b>Gire o celular</b><br>O Rabiola é jogado com o celular deitado.</div></div>
+
+<!-- ================= JANELAS ================= -->
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <h2>Pausa</h2>
+    <p id="pauseText">O vento espera por você.</p>
+    <button class="btn" id="resumeBtn">Continuar</button>
+    <button class="btn alt" id="menuBtn1">Menu</button>
+  </div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <div class="panel">
+    <h2 id="endTitle">Hora da janta!</h2>
+    <p id="endText"></p>
+    <button class="btn" id="againBtn">Jogar de novo</button>
+    <button class="btn alt" id="freeBtn">Continuar no livre</button>
+    <button class="btn alt" id="menuBtn2">Menu</button>
+  </div>
+</div>
+
+<!-- Bibliotecas -->
+<script src="vendor/ammo/ammo.wasm.js"></script>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js" } }
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
