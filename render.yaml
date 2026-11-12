@@ -1,9 +1,13 @@
-# Exemplo para hospedar o servidor online no Render (render.com).
-# O endereço que o Render der (https://SEU-APP.onrender.com) vira, no jogo,
-# wss://SEU-APP.onrender.com/ws  -> use no gerar-versao-portal.bat
+# Hospedagem do Rabiola no Render (render.com) — use "New > Blueprint" e escolha este repositório.
+# O jogo fica em https://SEU-APP.onrender.com e o online conecta sozinho em wss://SEU-APP.onrender.com/ws
+# (para a versão portal: gerar-versao-portal.bat com --server=wss://SEU-APP.onrender.com/ws)
 services:
   - type: web
     name: rabiola
     runtime: node
+    plan: free            # gratuito: "dorme" após 15 min sem ninguém e leva ~1 min para acordar
+    region: ohio
     buildCommand: npm run vendor
     startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true      # cada envio para o GitHub atualiza o jogo sozinho
