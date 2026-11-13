@@ -1,9 +1,9 @@
 // Pipas: desenho (formatos, estampas, rabiola) e a física da pipa do jogador
 import * as THREE from 'three';
-import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE } from './config.js';
+import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
 import { S, G, keys } from './state.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, setRot, forEachContact, UP } from './physics.js';
-import { scene, mesh, mat, smat, groundH, trees } from './scene.js';
+import { scene, mesh, mat, smat, groundH, trees, SCN } from './scene.js';
 import { lerp, smooth, wrapAngle, noise1 } from './utils.js';
 
 /* =========================================================
@@ -132,6 +132,7 @@ export function makeKiteMesh(type, patIdx) {
   tilt.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(0, b.maxY * .75 * s, 0), new THREE.Vector3(0, .05 * s, .45 * s), new THREE.Vector3(0, b.minY * .7 * s, 0)]), lineM));
   root.userData.bottom = b.minY * s;
+  root.userData.top = b.maxY * s;   // bico (onde a pipa fica pendurada quando é aparada)
   return root;
 }
 
@@ -326,7 +327,7 @@ function placeOnBack() {
 export function putOnBack() {
   const k = G.kite;
   S.state = 'costas'; S.stateTimer = 0; S.hideKite = false;
-  S.theta = 0; S.tension = 0; S.rawT = 0; S.overT = 0;
+  S.theta = 0; S.tension = 0; S.rawT = 0; S.overT = 0; S.stress = 0; S.jerk = 0;
   k.mesh.visible = true; k.tail.setVisible(true); lineObj.visible = false;
   placeOnBack();
 }
@@ -344,7 +345,7 @@ export function launchKite() {
 
 export function resetKite() {
   const k = G.kite, P = G.player.g.position;
-  const p = new THREE.Vector3().copy(P).addScaledVector(S.windDirH, 10); p.y = 8;
+  const p = new THREE.Vector3().copy(P).addScaledVector(S.windDirH, 10); p.y = Math.max(P.y + 8, groundH(p.x, p.z) + 4);
   S.kitePos.copy(p);
   setPos(k.body, p); setVel(k.body, new THREE.Vector3());
   k.links.forEach((lb, i) => {
@@ -352,7 +353,7 @@ export function resetKite() {
     setVel(lb, new THREE.Vector3());
   });
   S.L = Math.max(MIN_LINE, p.distanceTo(S.hand) + .2);
-  S.theta = 0; S.state = 'voando'; S.stateTimer = 0; S.overT = 0; S.tension = 0; S.rawT = 0;
+  S.theta = 0; S.state = 'voando'; S.stateTimer = 0; S.overT = 0; S.tension = 0; S.rawT = 0; S.stress = 0; S.jerk = 0;
   S.hideKite = false;
   k.mesh.visible = true; k.tail.setVisible(true); lineObj.visible = true;
 }
@@ -478,9 +479,12 @@ export function kitePhysicsStep(h, strayBodies) {
     S.kiteQ.slerp(_tq, 1 - Math.exp(-12 * h));
     setRot(body, S.kiteQ);
 
-    if (T > kt.breakN) S.overT += h; else S.overT = Math.max(0, S.overT - h * 2);
-    if (S.overT > .25 && S.running) failKite('arrebentou', 'A linha arrebentou!', 'Tensão alta demais. Alivie dando linha.');
-    if (_p.y < groundH(_p.x, _p.z) + .45 && S.running) failKite('caiu', 'Caiu no chão!', 'Mantenha a linha esticada!');
+    // "esforço" da linha = tensão média (~0,4 s) + trancos limitados: rajada rápida não arrebenta
+    S.stress += (T + S.jerk - S.stress) * (1 - Math.exp(-h / .4));
+    const lim = kt.breakN * LINE_STRENGTH;
+    if (S.stress > lim) S.overT += h; else S.overT = Math.max(0, S.overT - h * 1.5);
+    if (S.overT > BREAK_HOLD && S.running) failKite('arrebentou', 'A linha arrebentou!', 'Ficou muito tempo no vermelho. Dê linha para aliviar.');
+    if (_p.y < groundH(_p.x, _p.z) + .45 && S.running) failKite('caiu', 'Caiu ' + SCN.fallLabel(_p.x, _p.z) + '!', 'Mantenha a linha esticada!');
   } else if (S.state === 'enroscou') {
     setPos(body, S.stuckPos); setVel(body, ZERO_V);
   } else {
@@ -515,6 +519,7 @@ export function kitePhysicsStep(h, strayBodies) {
   PH.world.stepSimulation(h, 0);
 
   // depois do passo: a pipa não passa do comprimento da linha
+  S.jerk *= .9;
   if (S.state === 'voando') {
     getPos(body, _p);
     _d.subVectors(_p, S.hand);
@@ -523,7 +528,12 @@ export function kitePhysicsStep(h, strayBodies) {
       _u.copy(_d).divideScalar(dist);
       getVel(body, _v);
       const vr = _v.dot(_u);
-      if (vr > 0) { _v.addScaledVector(_u, -vr); setVel(body, _v); S.rawT += kt.mass * vr / h * .15; }
+      if (vr > 0) {
+        _v.addScaledVector(_u, -vr); setVel(body, _v);
+        const j = kt.mass * vr / h * .15;
+        S.rawT += j;
+        S.jerk = Math.max(S.jerk, Math.min(j, kt.breakN * .25)); // tranco conta, mas com limite
+      }
       _tmp.copy(S.hand).addScaledVector(_u, S.L);
       setPos(body, _tmp);
     }

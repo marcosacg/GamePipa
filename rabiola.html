@@ -44,6 +44,10 @@
         <button class="opt" data-mode="online"><b>Online</b><small>Crie uma sala e chame a turma.</small></button>
       </div>
 
+      <div class="label">Cenário</div>
+      <div class="row scenes" id="sceneRow"></div>
+      <div class="hint" id="sceneHint"></div>
+
       <div id="onlineBox" class="hidden">
         <div class="label">Seu apelido</div>
         <input id="nameIn" maxlength="16" autocomplete="off" spellcheck="false">
@@ -196,6 +200,7 @@
 </div>
 
 <!-- Bibliotecas -->
+<div id="fade"><span id="fadeText"></span></div>
 <script src="vendor/ammo/ammo.wasm.js"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three/three.module.js" } }

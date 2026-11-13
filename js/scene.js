@@ -123,12 +123,45 @@ export function updateSky(minutes, focus) {
   renderer.toneMappingExposure = lerp(1.25, 1.0, smooth(-8, 8, sunElev));
 }
 
-/* ---------------- cenário ---------------- */
+/* ---------------- cenário atual ----------------
+   Cada cenário (js/cenarios/*.js) preenche o SCN quando é montado:
+   ground(x,z)  altura do chão (inclui o telhado/laje das casas)
+   walk         retângulo onde o jogador anda
+   spawns       pontos onde os jogadores aparecem [x,z]
+   bots         cantinhos dos bots na disputa offline
+   npcZones     onde a molecada figurante fica e corre { x0,x1,z0,z1, homes:[[x,z]...] }
+   fallLabel    texto quando a pipa cai: "no chão", "na laje do vizinho"... */
 export const FIELD = { hx: 20, hz: 30 };
-export const trees = []; // {x,z,r,top,label} — usado para colisão do jogador e turbulência
-export function groundH(x, z) {
-  const r = Math.sqrt(x * x + z * z);
-  return smooth(110, 260, r) * (6 + noise2(x * .012, z * .012) * 9) + smooth(110, 200, r) * noise2(x * .05, z * .05) * 1.5;
+export const SCN = {
+  id: 'campinho',
+  ground: () => 0,
+  walk: { x0: -29.5, x1: 25.8, z0: -52, z1: 48 },
+  spawns: [[0, 22]],
+  bots: [[-12, 18], [13, 20], [5, 28], [-6, 30]],
+  npcZones: [],
+  fallLabel: () => 'no chão',
+};
+export const trees = [];    // {x,z,r,top,label} — turbulência do vento (e colisão de quem anda)
+export const blockers = []; // obstáculos de quem anda: {x,z,r} (círculo) ou {x0,x1,z0,z1} (retângulo)
+export function groundH(x, z) { return SCN.ground(x, z); }
+
+/** empurra quem anda para fora de árvores, caixas d'água etc. (raio r) */
+export function collideWalk(pos, r = .45) {
+  for (const t of trees) {
+    const dx = pos.x - t.x, dz = pos.z - t.z, d = Math.hypot(dx, dz), rr = r + .35;
+    if (d < rr && d > 0) { pos.x = t.x + dx / d * rr; pos.z = t.z + dz / d * rr; }
+  }
+  for (const b of blockers) {
+    if (b.r != null) {
+      const dx = pos.x - b.x, dz = pos.z - b.z, d = Math.hypot(dx, dz), rr = r + b.r;
+      if (d < rr && d > 0) { pos.x = b.x + dx / d * rr; pos.z = b.z + dz / d * rr; }
+    } else if (pos.x > b.x0 - r && pos.x < b.x1 + r && pos.z > b.z0 - r && pos.z < b.z1 + r) {
+      // sai pelo lado mais perto
+      const pl = pos.x - (b.x0 - r), pr = (b.x1 + r) - pos.x, pb = pos.z - (b.z0 - r), pf = (b.z1 + r) - pos.z;
+      const m = Math.min(pl, pr, pb, pf);
+      if (m === pl) pos.x = b.x0 - r; else if (m === pr) pos.x = b.x1 + r; else if (m === pb) pos.z = b.z0 - r; else pos.z = b.z1 + r;
+    }
+  }
 }
 
 /** céu e estrelas acompanham a câmera */

@@ -23,16 +23,19 @@ function quatFromBasis(x, y, z) {
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
+/** mundo padrão (campinho plano); o jogo passa o do cenário atual */
+const FLAT = { bases: [[-12, 18], [13, 20], [5, 28], [-6, 30]], ground: () => 0, walk: { x0: -29.5, x1: 25.8, z0: -52, z1: 48 } };
+
 class Bot {
-  constructor(id, meta, base) {
-    this.id = id; this.meta = meta; this.base = base;
-    this.pos = [base[0], 0, base[1]];
+  constructor(id, meta, base, world = FLAT) {
+    this.id = id; this.meta = meta; this.base = base; this.world = world;
+    this.pos = [base[0], world.ground(base[0], base[1]), base[1]];
     this.az = rnd(-.5, .5); this.el = .8; this.L = rnd(25, 40);
     this.flying = true; this.respawn = 0;
     this.target = null; this.retarget = rnd(2, 6);
     this.sta = 1; this.pull = false; this.give = false; this.pullT = 0;
     this.ph = Math.random() * 10; this.tilt = 0;
-    this.hand = [base[0], 1.3, base[1]]; this.k = [base[0], 20, base[1] - 20]; this.q = [0, 0, 0, 1];
+    this.hand = [base[0], this.pos[1] + 1.3, base[1]]; this.k = [base[0], this.pos[1] + 20, base[1] - 20]; this.q = [0, 0, 0, 1];
     this.yaw = Math.PI; this.mv = 0; this.T = 3; this.skill = rnd(.7, 1.1);
     this.n = Math.min(10, KITES[meta.kite.type]?.tail || 0); this.te = null;
     this.aimTail = false; this.shake = false; this.shakeT = 0;
@@ -40,13 +43,15 @@ class Bot {
   update(dt, t, W, arena, states) {
     const windAz = Math.atan2(W.dx, W.dz);
     // anda um pouquinho em volta do seu canto
-    const wx = this.base[0] + Math.sin(t * .05 + this.ph) * 3, wz = this.base[1] + Math.cos(t * .04 + this.ph) * 2;
+    const Wk = this.world.walk;
+    const wx = cl(this.base[0] + Math.sin(t * .05 + this.ph) * 3, Wk.x0, Wk.x1), wz = cl(this.base[1] + Math.cos(t * .04 + this.ph) * 2, Wk.z0, Wk.z1);
     const dx0 = wx - this.pos[0], dz0 = wz - this.pos[2];
     const dd = Math.hypot(dx0, dz0);
     const spd = dd > .3 ? Math.min(1.4, dd) : 0;
     if (spd) { this.pos[0] += dx0 / dd * spd * dt; this.pos[2] += dz0 / dd * spd * dt; }
     this.mv = spd;
-    this.hand = [this.pos[0], 1.3, this.pos[2]];
+    this.pos[1] = this.world.ground(this.pos[0], this.pos[2]);
+    this.hand = [this.pos[0], this.pos[1] + 1.3, this.pos[2]];
 
     if (!this.flying) {
       this.respawn -= dt;
@@ -96,7 +101,14 @@ class Bot {
     if (this.flying) this.L += cl(desL - this.L, -3 * dt, 3 * dt);
     this.el += cl((.85 + .12 * Math.sin(t * .31 + this.ph)) * Math.min(1, W.speed / 5) - this.el, -.3 * dt, .3 * dt);
 
-    const a = windAz + this.az, ce = Math.cos(this.el);
+    const a = windAz + this.az;
+    // no morro/na favela: se a pipa fosse ficar no meio das casas, o bot sobe ela
+    for (let k = 0; k < 6; k++) {
+      const ce0 = Math.cos(this.el), kx = this.hand[0] + Math.sin(a) * ce0 * this.L, kz = this.hand[2] + Math.cos(a) * ce0 * this.L;
+      if (this.hand[1] + Math.sin(this.el) * this.L > this.world.ground(kx, kz) + 6 || this.el > 1.35) break;
+      this.el += .06;
+    }
+    const ce = Math.cos(this.el);
     const u = [Math.sin(a) * ce, Math.sin(this.el), Math.cos(a) * ce];
     this.k = [this.hand[0] + u[0] * this.L, this.hand[1] + u[1] * this.L, this.hand[2] + u[2] * this.L];
     this.T = (1.5 + W.speed * .6) * (.8 + .2 * Math.sin(t * 2 + this.ph));
@@ -136,10 +148,12 @@ class Bot {
 }
 
 export class LocalSession {
-  constructor(me, nBots = 3) {
+  /** world = { bases, ground(x,z), walk } do cenário atual */
+  constructor(me, nBots = 3, world = FLAT) {
     this.myId = 'eu';
     this.label = 'Contra a molecada';
     this.arena = new Arena(DISPUTA_WIND);
+    this.arena.groundAt = world.ground; // avoada some quando chega no chão/telhado
     this.wind = DISPUTA_WIND;
     this.t = 0;
     this.events = [];
@@ -148,7 +162,7 @@ export class LocalSession {
     this.myState = null;
     this.arena.addPlayer('eu', me);
     this.round = { state: 'playing', endsAt: DUEL.roundTime };
-    const bases = [[-12, 18], [13, 20], [5, 28], [-6, 30]];
+    const bases = world.bases;
     const names = [...BOT_NAMES].sort(() => Math.random() - .5);
     for (let i = 0; i < nBots; i++) {
       const type = KITE_ORDER[Math.floor(Math.random() * KITE_ORDER.length)];
@@ -156,7 +170,7 @@ export class LocalSession {
         name: names[i], style: { ...PRESETS[Math.floor(Math.random() * PRESETS.length)].style },
         kite: { type, pat: Math.floor(Math.random() * getPatterns(type).length) },
       };
-      const b = new Bot('b' + i, meta, bases[i % bases.length]);
+      const b = new Bot('b' + i, meta, bases[i % bases.length], world);
       this.bots.push(b);
       this.arena.addPlayer(b.id, meta);
       this.others.set(b.id, { meta, state: null });

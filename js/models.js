@@ -6,6 +6,7 @@ import { PRESETS, KITE_ORDER, KITES, getPatterns, SPOOLS, SHIRTS } from './confi
 import { makeCharacter, shirtTexture, angerTexture } from './player.js';
 import { makeKiteMesh, kiteThumb } from './kite.js';
 import * as props from './props.js';
+import { makeFavelaBlock, favelaTex } from './cenarios/favela.js';
 
 const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -34,6 +35,8 @@ export function assetList() {
   list.push({ pasta: 'cenario', nome: 'nuvem', criar: () => props.makeCloud(4) });
   list.push({ pasta: 'cenario', nome: 'tufo-de-capim', criar: () => props.makeGrassClump() });
   list.push({ pasta: 'cenario', nome: 'morro', criar: () => props.makeHill(30, 14, 2) });
+  list.push({ pasta: 'cenario', nome: 'favela-quarteirao-colorido', criar: () => makeFavelaBlock(3, .35) });
+  list.push({ pasta: 'cenario', nome: 'favela-quarteirao-tijolo', criar: () => makeFavelaBlock(8, .85) });
   return list;
 }
 
@@ -45,6 +48,7 @@ export function textureList() {
   SHIRTS.forEach((sh, i) => { if (sh.mode === 'sem') return; const t = shirtTexture(i); list.push({ pasta: 'texturas/camisas', nome: slug(sh.name), img: () => t.image }); });
   for (const k of Object.keys(props.textures)) list.push({ pasta: 'texturas/cenario', nome: k, img: () => props.textures[k]().image });
   list.push({ pasta: 'texturas/efeitos', nome: 'bravo', img: () => angerTexture().image });
+  for (const k of Object.keys(favelaTex)) list.push({ pasta: 'texturas/favela', nome: k === 'luz' ? 'janelas-acesas' : k === 'tijolo' || k === 'pintada' ? 'fachada-' + k : k, img: () => favelaTex[k]().image });
   return list;
 }
 
@@ -62,5 +66,6 @@ export const SHOWCASE = {
     items: [...SPOOLS.map(s => { const m = props.makeSpoolModel(s.id); m.position.y = .5; m.scale.setScalar(3); return m; }), (() => { const b = props.makeBall(); b.scale.setScalar(3); b.position.y = .33; return b; })(), (() => { const v = props.makeBambooPole(); v.position.y = .45; return v; })()],
     spacing: 1.2, focusY: 1, dist: 6.5,
   }),
+  'Favela': () => ({ items: [makeFavelaBlock(3, .35), makeFavelaBlock(8, .85)], spacing: 36, focusY: 6, dist: 62 }),
   'Cenário': () => ({ items: [props.makeGoal(), props.makePole(), (() => { const r = props.makeRing(); r.scale.setScalar(.6); return r; })(), (() => { const c = props.makeCloud(2); c.scale.setScalar(.18); c.position.y = 7; return c; })(), (() => { const g = props.makeGrassClump(); g.scale.setScalar(3); return g; })()], spacing: 7.5, focusY: 3.2, dist: 24 }),
 };

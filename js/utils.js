@@ -37,4 +37,5 @@ export function segDist(p, a, b) {
 
 // gerador pseudo-aleatório com semente (cenário sempre igual)
 let seed = 7;
+export function setSeed(n) { seed = n; }
 export function srand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }

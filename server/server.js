@@ -7,7 +7,8 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Arena, DUEL, KITE_TYPES, PROTOCOL } from '../js/shared/duel.js';
+import { Arena, DUEL, KITE_TYPES, PROTOCOL, SCENES } from '../js/shared/duel.js';
+import { approxGround } from '../js/shared/terrenos.js';
 import { VENDOR, ensureVendor } from './vendor.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -153,10 +154,12 @@ function newCode() {
 }
 
 class Room {
-  constructor(code) {
+  constructor(code, scene = 'campinho') {
     this.code = code;
+    this.scene = scene;       // cenário escolhido por quem criou a sala
     this.players = new Map(); // id -> { conn, meta, state }
     this.arena = new Arena();
+    this.arena.groundAt = approxGround(scene);
     this.t0 = Date.now();
     this.round = { state: 'playing', endsAt: this.time() + DUEL.roundTime };
     this.scoreTimer = 0;
@@ -195,7 +198,7 @@ function onConnection(conn) {
     if (m.t === 'join' && !room) {
       const name = str(m.name, 16, 'Moleque');
       let code = str(m.room, 4, '').toUpperCase();
-      if (m.create) { code = newCode(); rooms.set(code, new Room(code)); }
+      if (m.create) { code = newCode(); rooms.set(code, new Room(code, SCENES.includes(m.scene) ? m.scene : 'campinho')); }
       else if (m.random) {
         // sorteia uma sala já criada que ainda tenha vaga
         const open = [...rooms.values()].filter(r => r.players.size > 0 && r.players.size < DUEL.maxPlayers);
@@ -210,12 +213,12 @@ function onConnection(conn) {
       room.players.set(id, { conn, meta, state: null });
       room.arena.addPlayer(id, meta);
       conn.send({
-        t: 'welcome', v: PROTOCOL, id, room: room.code, rt: room.time(), round: room.round,
+        t: 'welcome', v: PROTOCOL, id, room: room.code, scene: room.scene, rt: room.time(), round: room.round,
         players: [...room.players].filter(([pid]) => pid !== id).map(([pid, p]) => publicPlayer(pid, p)),
         scores: room.arena.scores(),
       });
       room.broadcast({ t: 'pjoin', p: publicPlayer(id, room.players.get(id)) }, id);
-      console.log(`[${room.code}] ${name} entrou (${room.players.size} na sala)`);
+      console.log(`[${room.code}] ${name} entrou (${room.players.size} na sala, cenário ${room.scene})`);
       return;
     }
     if (!room) return;

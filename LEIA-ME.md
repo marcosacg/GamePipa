@@ -13,6 +13,17 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 3. Na **primeira vez** precisa de internet: o servidor baixa Three.js, Ammo.js e as fontes para a pasta `vendor/`.
    Depois disso o jogo roda **sem internet**. (Para baixar tudo de uma vez: `npm run vendor`.)
 
+## Cenários
+
+Escolha no menu, aba **Jogar** → **Cenário**. O mundo atrás do menu já muda na hora.
+
+- **Campinho**: o campo de várzea aberto, com árvores, traves, muro pichado e a bola.
+- **Laje**: em cima da laje, no meio da favela. O morro cheio de casas sobe bem na frente (é pra lá que o vento leva a pipa), com árvores no topo. Cuidado com a laje do vizinho, os fios e os "gatos" de luz. A molecada fica nas lajes do lado.
+- **Morro**: no terrão lá no alto. A favela de tijolo desce a ladeira e sobe o morro do outro lado, com o teleférico passando no meio.
+
+No **online**, vale o cenário de quem **criou** a sala: quem entra com código ou pela "Aleatória" vai direto para o cenário dela.
+(Precisa do servidor novo: feche e abra o `iniciar-servidor.bat`. No Render, basta enviar para o GitHub.)
+
 ## Modos
 
 | Modo | O que é |
@@ -38,6 +49,8 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   **R** guarda a pipa nas costas.
 - **Resultado:** quem perde tem a linha arrebentada e a pipa vira **avoada** (marcada no céu). Qualquer jogador,
   inclusive o dono depois que soltar outra, pode **aparar** encostando a linha nela.
+  Quando apara, a rabiola da avoada enrosca na sua linha e ela fica pendurada pela rabiola uns 6 segundos,
+  escorregando devagar, e aí vem o "Aparou!" (todo mundo vê a pipa pendurada na linha de quem aparou).
 - **Recomeço:** depois de perder, cair ou enroscar, uma contagem de **2 segundos** e já vem pipa nova Enquanto isso o boneco fica bravo (bate o pé, sacode os braços e solta um "#@$%!").
 - **Pontos:** laçada = 100, aparada = 50.
 - Linha comum, sem cerol: vence quem segura a enroscada.
@@ -106,7 +119,10 @@ js/physics.js         mundo Ammo.js e atalhos
 js/scene.js           renderizador, luz, céu e estrelas
 js/materials.js       materiais (suaves e facetados) e atalho para malhas
 js/props.js           modelos do cenário: árvores, casas, trave, poste, nuvens, capim, texturas pintadas
-js/world.js           monta o campo com os modelos + colisões, e anima vento no capim, nuvens e bandeirinhas
+js/world.js           troca de cenário: monta o escolhido (malhas + colisões) e desmonta o anterior
+js/cenarios/          campinho.js, laje.js, morro.js e favela.js (gerador de favela: casas, janelas, lajes, caixas d'água, fios, varal)
+js/shared/terrenos.js formato do terreno de cada cenário (jogo e servidor usam o mesmo)
+img/cenarios/         miniaturas dos cenários no menu
 js/kite.js            formatos/estampas das pipas, rabiola e física da pipa do jogador
 js/player.js          personagem estilizado (cabelos, bonés, camisas) e poses
 js/remote.js          outros jogadores e avoadas (visual)

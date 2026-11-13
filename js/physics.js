@@ -33,6 +33,7 @@ export function makeBody(shape, mass, pos, quat, group, mask, tag) {
   const info = new A.btRigidBodyConstructionInfo(mass, ms, shape, inertia);
   const body = new A.btRigidBody(info);
   PH.world.addRigidBody(body, group, mask);
+  if (PH.track) PH.track.push(body); // corpos do cenário (para trocar de cenário)
   if (tag) PH.tags.set(A.getPointer(body), tag);
   body._ms = ms;
   return body;

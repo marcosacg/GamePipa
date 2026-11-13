@@ -284,3 +284,31 @@ body.touch .keys { display: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ================= CENÁRIOS ================= */
+.scenes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.scene { border: 2px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05); border-radius: 12px; padding: 0 0 8px;
+  cursor: pointer; text-align: left; overflow: hidden; color: inherit; font: inherit;
+  transition: transform .18s var(--ease-back), border-color .2s, background-color .2s, box-shadow .2s; }
+.scene:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
+.scene:active { transform: scale(.96); transition-duration: .06s; }
+.scene.sel { border-color: var(--sun); background: rgba(255,209,102,.14); box-shadow: 0 6px 18px rgba(255,209,102,.16); animation: selPop .32s var(--ease-back); }
+.scene .thumb { height: 64px; background: linear-gradient(160deg, #7fb6e0, #c98d5a) center / cover no-repeat; margin-bottom: 6px;
+  transition: transform .5s var(--ease-out); }
+.scene .thumb[data-scene=campinho] { background-color: #6fa03c; }
+.scene:hover .thumb { transform: scale(1.06); }
+.scene b { display: block; font-size: 15px; padding: 0 9px; }
+.scene small { display: block; opacity: .72; font-size: 11.5px; line-height: 1.3; padding: 2px 9px 0; }
+@media (max-width: 520px) { .scene small { display: none; } .scene .thumb { height: 52px; } }
+
+/* tela escurece rapidinho enquanto o cenário é montado */
+#fade { position: fixed; inset: 0; z-index: 60; pointer-events: none; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 45%, rgba(29,26,58,.92), rgba(12,10,26,.98)); opacity: 0; transition: opacity .26s ease; }
+#fade.on { opacity: 1; pointer-events: auto; }
+#fade span { font: 400 22px Bungee, sans-serif; color: var(--sun); letter-spacing: 1px; transform: translateY(8px); transition: transform .4s var(--ease-out); }
+#fade.on span { transform: none; }
+
+/* linha no limite: a barra de tensão pisca */
+@keyframes perigo { 50% { opacity: .35; } }
+#tensionBar.perigo { box-shadow: 0 0 0 2px rgba(230,57,70,.6); }
+#tensionBar.perigo i { animation: perigo .3s linear infinite; }

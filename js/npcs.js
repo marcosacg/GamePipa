@@ -3,12 +3,11 @@
 import * as THREE from 'three';
 import { S, G } from './state.js';
 import { PRESETS } from './config.js';
-import { scene, mesh, mat, groundH, trees } from './scene.js';
-import { makeCharacter, poseCharacter, poseAngry } from './player.js';
+import { scene, mesh, mat, groundH, SCN, collideWalk } from './scene.js';
+import { makeCharacter, poseCharacter, poseAngry, disposeCharacter } from './player.js';
 import { makeBambooPole } from './props.js';
 import { clamp, lerpAngle, rand } from './utils.js';
 
-const HOMES = [[-24, 27], [19, 31], [-23, -22], [15, -35]]; // cantinhos onde ficam à toa
 const MAX_PER_KITE = 2;
 const npcs = [];
 let assignT = 0;
@@ -21,19 +20,29 @@ function makePole() {
   return g;
 }
 
+/** remove a molecada (troca de cenário) */
+export function clearNPCs() {
+  for (const n of npcs) { scene.remove(n.c.g); disposeCharacter(n.c); }
+  npcs.length = 0;
+}
+
+/** cria a molecada nas zonas do cenário atual (campo inteiro, lajes dos vizinhos...) */
 export function initNPCs() {
+  clearNPCs();
   const presets = [...PRESETS].sort(() => Math.random() - .5);
-  HOMES.forEach(([x, z], i) => {
+  const homes = [];
+  for (const zone of SCN.npcZones) for (const h of zone.homes) homes.push([h[0], h[1], zone]);
+  homes.forEach(([x, z, zone], i) => {
     const style = { ...presets[i % presets.length].style, skin: Math.floor(Math.random() * 5), shirt: Math.floor(Math.random() * 6) };
     const c = makeCharacter(style);
     c.spool.visible = false;             // figurante não tem carretel, tem vara
     c.armR.add(makePole());
-    c.g.position.set(x + rand(-2, 2), 0, z + rand(-2, 2));
+    c.g.position.set(clamp(x + rand(-1, 1), zone.x0, zone.x1), 0, clamp(z + rand(-1, 1), zone.z0, zone.z1));
     c.g.position.y = groundH(c.g.position.x, c.g.position.z);
     c.g.scale.setScalar(rand(.82, .95)); // a molecada é um pouco menor
     scene.add(c.g);
     npcs.push({
-      c, home: new THREE.Vector3(x, 0, z), mode: 'idle', target: null, lastPos: new THREE.Vector3(),
+      c, zone, home: new THREE.Vector3(x, 0, z), mode: 'idle', target: null, lastPos: new THREE.Vector3(),
       timer: 0, speed: rand(5.2, 6.6), vel: new THREE.Vector3(), yaw: Math.random() * 6.28,
       wander: new THREE.Vector3(x, 0, z), wanderT: rand(1, 4), ph: Math.random() * 10, jump: 0,
     });
@@ -59,7 +68,7 @@ export function updateNPCs(dt, t) {
   for (const n of npcs) {
     if (n.mode === 'chase' && !alive.has(n.target)) {
       const dh = Math.hypot(n.lastPos.x - n.c.g.position.x, n.lastPos.z - n.c.g.position.z);
-      n.mode = dh < 6 && n.lastPos.y < 7 ? 'celebrate' : 'upset';
+      n.mode = dh < 6 && n.lastPos.y < n.c.g.position.y + 7 ? 'celebrate' : 'upset';
       n.timer = n.mode === 'celebrate' ? 1.8 : 1.4;
       n.target = null;
     }
@@ -90,7 +99,7 @@ export function updateNPCs(dt, t) {
       _goal.copy(n.target.pos).addScaledVector(S.windDirH, 3 + n.ph % 2);
       _goal.y = 0;
       speed = n.speed;
-      const low = n.target.pos.y < 7 && Math.hypot(n.target.pos.x - pos.x, n.target.pos.z - pos.z) < 4;
+      const low = n.target.pos.y < pos.y + 7 && Math.hypot(n.target.pos.x - pos.x, n.target.pos.z - pos.z) < 4;
       n.jump = low ? n.jump + dt : 0;
     } else if (n.mode === 'return' || n.mode === 'idle') {
       if (n.mode === 'return') {
@@ -98,7 +107,7 @@ export function updateNPCs(dt, t) {
         if (Math.hypot(n.home.x - pos.x, n.home.z - pos.z) < 1.5) n.mode = 'idle';
       } else {
         n.wanderT -= dt;
-        if (n.wanderT <= 0) { n.wanderT = rand(3, 7); n.wander.set(n.home.x + rand(-3, 3), 0, n.home.z + rand(-3, 3)); }
+        if (n.wanderT <= 0) { n.wanderT = rand(3, 7); n.wander.set(clamp(n.home.x + rand(-3, 3), n.zone.x0, n.zone.x1), 0, clamp(n.home.z + rand(-3, 3), n.zone.z0, n.zone.z1)); }
         _goal.copy(n.wander); speed = 1.2;
       }
     } else { // comemorando ou bravo: fica parado
@@ -108,20 +117,18 @@ export function updateNPCs(dt, t) {
     }
 
     // movimento simples
+    _goal.x = clamp(_goal.x, n.zone.x0, n.zone.x1); _goal.z = clamp(_goal.z, n.zone.z0, n.zone.z1); // não sai da sua laje/do campo
     _to.set(_goal.x - pos.x, 0, _goal.z - pos.z);
     const d = _to.length();
     if (d > .4 && speed > 0) _to.multiplyScalar(Math.min(speed, d * 2) / d); else _to.set(0, 0, 0);
     n.vel.lerp(_to, 1 - Math.exp(-6 * dt));
     pos.addScaledVector(n.vel, dt);
-    for (const tr of trees) {
-      const dx = pos.x - tr.x, dz = pos.z - tr.z, dd = Math.hypot(dx, dz);
-      if (dd < .9 && dd > 0) { pos.x = tr.x + dx / dd * .9; pos.z = tr.z + dz / dd * .9; }
-    }
+    collideWalk(pos, .4);
     if (G.player) { // não atravessa o jogador
       const p = G.player.g.position, dx = pos.x - p.x, dz = pos.z - p.z, dd = Math.hypot(dx, dz);
       if (dd < .7 && dd > 0) { pos.x = p.x + dx / dd * .7; pos.z = p.z + dz / dd * .7; }
     }
-    pos.x = clamp(pos.x, -48, 48); pos.z = clamp(pos.z, -57, 51);
+    pos.x = clamp(pos.x, n.zone.x0, n.zone.x1); pos.z = clamp(pos.z, n.zone.z0, n.zone.z1);
     pos.y = groundH(pos.x, pos.z);
 
     const sp = n.vel.length();

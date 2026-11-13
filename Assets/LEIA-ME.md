@@ -9,8 +9,8 @@ Modelos 3D e imagens do jogo, exportados do mesmo código que o jogo usa para de
 | `personagens/` | os 6 estilos prontos do menu + o figurante com vara de bambu |
 | `pipas/` | todas as pipas em todas as estampas, com rabiola (laços ou fitas) e cabresto |
 | `objetos/` | carretéis (lata, papelão, carretilha), vara de bambu, bola, trave, poste, argola |
-| `cenario/` | árvores (mangueira, eucalipto, jamelão), casas (reboco 1 e 2 andares, tijolo), nuvem, tufo de capim, morro |
-| `texturas/` | PNGs: estampas das pipas, camisas, reboco, tijolo, grama, bola e o balão de "bravo" |
+| `cenario/` | árvores (mangueira, eucalipto, jamelão), casas (reboco 1 e 2 andares, tijolo), nuvem, tufo de capim, morro e dois quarteirões de favela (colorido e de tijolo) |
+| `texturas/` | PNGs: estampas das pipas, camisas, reboco, tijolo, grama, bola, o balão de "bravo" e, em `favela/`, as fachadas (tijolo e pintada), as janelas acesas, a laje e a terra |
 
 `lista-de-arquivos.md` lista cada arquivo com o tamanho.
 

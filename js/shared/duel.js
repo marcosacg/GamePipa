@@ -27,7 +27,8 @@ export const DUEL = {
 export const KITE_TYPES = ['pipa', 'raia', 'capucheta', 'bico', 'quadrada'];
 
 // versão das regras/mensagens: se o servidor rodando for mais velho que os arquivos, o jogo avisa
-export const PROTOCOL = 6;
+export const PROTOCOL = 7; // 7: salas guardam o cenário (campinho, laje, morro)
+export const SCENES = ['campinho', 'laje', 'morro'];
 
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -254,13 +255,14 @@ export class Arena {
       s.p[0] += (W.dx * W.speed * 0.8 * hf + Math.sin(t * 1.3 + s.ph) * 0.8) * dt;
       s.p[1] -= 0.9 * dt;
       s.p[2] += W.dz * W.speed * 0.8 * hf * dt;
-      if (s.p[1] < 0.5 || s.age > 70) { this.strays.splice(i, 1); continue; }
+      const gy = this.groundAt ? this.groundAt(s.p[0], s.p[2]) : 0; // chão/telhado do cenário
+      if (s.p[1] < gy + 0.5 || s.age > 70) { this.strays.splice(i, 1); continue; }
       if (s.age < 1.2) continue;
       for (const p of this.players.values()) {
         if (!flying(p) || (s.owner === p.id && s.age < 2.2)) continue; // até o dono pode aparar de volta
         if (pointSeg(s.p, p.s.hand, p.s.k) < DUEL.catchDist) {
           p.score += 50; p.aparadas++;
-          ev.push({ type: 'catch', id: s.id, by: p.id, p: s.p.slice() });
+          ev.push({ type: 'catch', id: s.id, by: p.id, p: s.p.slice(), kite: s.kite });
           this.strays.splice(i, 1);
           break;
         }
@@ -272,12 +274,12 @@ export class Arena {
       this.ambient -= dt;
       if (this.ambient <= 0) {
         this.ambient = 20 + Math.random() * 15;
-        let cx = 0, cz = 0, n = 0;
-        for (const p of this.players.values()) if (p.s) { cx += p.s.hand[0]; cz += p.s.hand[2]; n++; }
+        let cx = 0, cy = 0, cz = 0, n = 0;
+        for (const p of this.players.values()) if (p.s) { cx += p.s.hand[0]; cy += p.s.hand[1]; cz += p.s.hand[2]; n++; }
         if (n) {
-          cx /= n; cz /= n;
+          cx /= n; cy /= n; cz /= n;
           const side = (Math.random() - 0.5) * 40;
-          const pos = [cx - W.dx * 55 - W.dz * side, 28 + Math.random() * 17, cz - W.dz * 55 + W.dx * side];
+          const pos = [cx - W.dx * 55 - W.dz * side, cy + 28 + Math.random() * 17, cz - W.dz * 55 + W.dx * side]; // acima de quem está jogando (laje, morro...)
           const type = KITE_TYPES[Math.floor(Math.random() * KITE_TYPES.length)];
           this.spawnStray(pos, { type, pat: Math.floor(Math.random() * 3) }, null);
           ev.push({ type: 'strayIn' });

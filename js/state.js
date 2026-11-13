@@ -8,7 +8,7 @@ export const S = {
   style: null,                   // estilo do personagem
   name: 'Moleque',
   clock: 0, minutes: 16 * 60,
-  L: 16, tension: 0, rawT: 0, overT: 0, theta: 0,
+  L: 16, tension: 0, rawT: 0, overT: 0, stress: 0, jerk: 0, theta: 0,
   state: 'voando', stateTimer: 0, stuckPos: new THREE.Vector3(), hideKite: false,
   score: 0, scoreFrac: 0,
   windBase: 5.8, gustAmp: .35, windSpeed: 6, windDir: 0,

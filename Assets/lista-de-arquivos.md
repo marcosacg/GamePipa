@@ -3,9 +3,9 @@
 | arquivo | tamanho |
 |---|---|
 | personagens/moleque-da-laje.glb | 290 KB |
-| personagens/bone-pra-tras.glb | 317 KB |
+| personagens/bone-pra-tras.glb | 318 KB |
 | personagens/black-power.glb | 314 KB |
-| personagens/chapeu-de-palha.glb | 301 KB |
+| personagens/chapeu-de-palha.glb | 300 KB |
 | personagens/trancinhas.glb | 327 KB |
 | personagens/sem-camisa.glb | 289 KB |
 | personagens/figurante-com-vara.glb | 334 KB |
@@ -52,6 +52,8 @@
 | cenario/nuvem.glb | 116 KB |
 | cenario/tufo-de-capim.glb | 2 KB |
 | cenario/morro.glb | 34 KB |
+| cenario/favela-quarteirao-colorido.glb | 1161 KB |
+| cenario/favela-quarteirao-tijolo.glb | 1171 KB |
 | texturas/estampas-de-pipa/pipa-1.png | 16 KB |
 | texturas/estampas-de-pipa/pipa-2.png | 16 KB |
 | texturas/estampas-de-pipa/pipa-3.png | 16 KB |
@@ -88,3 +90,8 @@
 | texturas/cenario/grama.png | 22 KB |
 | texturas/cenario/bola.png | 41 KB |
 | texturas/efeitos/bravo.png | 10 KB |
+| texturas/favela/fachada-tijolo.png | 539 KB |
+| texturas/favela/fachada-pintada.png | 362 KB |
+| texturas/favela/janelas-acesas.png | 6 KB |
+| texturas/favela/laje.png | 102 KB |
+| texturas/favela/terra.png | 86 KB |

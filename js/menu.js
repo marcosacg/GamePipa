@@ -4,6 +4,7 @@ import { KITES, KITE_ORDER, getPatterns, SKINS, HAIRS, HATS, SHIRTS, SHORTS, SPO
 import { kiteThumb } from './kite.js';
 import { $ } from './hud.js';
 import { Ads } from './platform.js';
+import { SCENE_LIST } from './world.js';
 
 const UNLOCK_KEY = 'rabiola:liberadas';
 function unlocked() { try { return new Set(JSON.parse(localStorage.getItem(UNLOCK_KEY)) || []); } catch { return new Set(); } }
@@ -35,6 +36,9 @@ export function buildMenu(actions) {
   if (prefs.kite && KITES[prefs.kite.type]) { S.kiteType = prefs.kite.type; S.patIdx = prefs.kite.pat | 0; }
   if (isLocked(S.kiteType, S.patIdx)) S.patIdx = 0;
   selMode = ['livre', 'desafios', 'disputa', 'online'].includes(prefs.mode) ? prefs.mode : 'livre';
+  S.scene = SCENE_LIST.some(s => s.id === prefs.scene) ? prefs.scene : 'campinho';
+  buildSceneRow();
+  showScene(S.scene, false);
   S.fxTail = prefs.fxTail === true; // animação da rabiola presa (começa desligada)
   const fxBtn = $('fxTailBtn');
   const fxTxt = () => { fxBtn.textContent = 'Animação da rabiola presa: ' + (S.fxTail ? 'ligada' : 'desligada'); fxBtn.classList.toggle('sel', S.fxTail); };
@@ -66,8 +70,33 @@ export function buildMenu(actions) {
 }
 
 function persist() {
-  prefs = { style: S.style, name: S.name, kite: { type: S.kiteType, pat: S.patIdx }, mode: selMode, fxTail: !!S.fxTail };
+  prefs = { style: S.style, name: S.name, kite: { type: S.kiteType, pat: S.patIdx }, mode: selMode, fxTail: !!S.fxTail, scene: S.scene };
   savePrefs(prefs);
+}
+
+/* ---------------- cenários ---------------- */
+function buildSceneRow() {
+  const row = $('sceneRow'); row.innerHTML = '';
+  for (const sc of SCENE_LIST) {
+    const b = el('button', 'scene' + (sc.id === S.scene ? ' sel' : ''));
+    b.dataset.scene = sc.id;
+    const img = el('div', 'thumb'); img.style.backgroundImage = `url(img/cenarios/${sc.id}.jpg)`; img.dataset.scene = sc.id;
+    b.append(img, el('b', null, sc.nome), el('small', null, sc.desc));
+    b.onclick = () => { if (S.scene === sc.id) return; showScene(sc.id); A.scene(sc.id); };
+    row.append(b);
+  }
+}
+/** marca o cenário no menu (também usado quando a sala online é de outro cenário) */
+const TAGS = {
+  campinho: 'Fim de tarde no campinho de várzea. Pegue a lata, solte linha e domine o céu.',
+  laje: 'Fim de tarde na laje. Pegue a lata, solte linha e domine o céu da favela.',
+  morro: 'Fim de tarde lá no alto do morro. Pegue a lata, solte linha e domine o céu.',
+};
+export function showScene(id, save = true) {
+  S.scene = id;
+  const tag = document.querySelector('.menu-card > .tag'); if (tag && TAGS[id]) tag.textContent = TAGS[id];
+  $('sceneRow').querySelectorAll('.scene').forEach(b => b.classList.toggle('sel', b.dataset.scene === id));
+  if (save) persist();
 }
 
 const TABS = ['jogar', 'personagem', 'pipa'];
@@ -97,6 +126,7 @@ function refreshMode() {
   $('onlineBox').classList.toggle('hidden', !online);
   $('playBtn').classList.toggle('hidden', online);
   $('netMsg').textContent = '';
+  $('sceneHint').textContent = online ? 'Vale para a sala que você criar. Entrando numa sala, você vai para o cenário dela.' : '';
   buildQuickPresets();
 }
 

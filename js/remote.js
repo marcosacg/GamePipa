@@ -1,7 +1,7 @@
 // Outros jogadores (online ou bots) e pipas avoadas da disputa — só visual, sem física
 import * as THREE from 'three';
 import { KITES } from './config.js';
-import { scene, makeLabel } from './scene.js';
+import { scene, makeLabel, groundH } from './scene.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry } from './player.js';
 import { makeKiteMesh, TailRenderer, proceduralTail, backPose, hangTail, BACK_SCALE, pinTail } from './kite.js';
 import { DUEL } from './shared/duel.js';
@@ -125,6 +125,7 @@ export class RemoteView {
 /** pipa avoada da disputa (posição vem da arena) */
 export class StrayView {
   constructor(kite) {
+    this.kite = kite; // tipo/estampa (usado quando ela é aparada)
     const type = KITES[kite.type] ? kite.type : 'pipa';
     this.mesh = makeKiteMesh(type, kite.pat || 0);
     this.mesh.scale.setScalar(.9);
@@ -144,6 +145,7 @@ export class StrayView {
   update(dt, t, windDirH) {
     this.pos.lerp(this.target, 1 - Math.exp(-8 * dt));
     const p = this.pos;
+    p.y = Math.max(p.y, groundH(p.x, p.z) + .35); // não atravessa o telhado/chão
     this.mesh.position.copy(p);
     this.mesh.lookAt(this._t.copy(p).addScaledVector(windDirH, -5));
     this.mesh.rotateZ(Math.sin(t * 2.2 + this.ph) * .6);

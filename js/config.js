@@ -7,6 +7,10 @@ export const AMMO_BASE = 'vendor/ammo/'; // bibliotecas locais (pasta vendor/, v
 export const H = 1 / 120;                 // passo fixo da física
 export const RESPAWN = 2;                 // segundos até soltar uma pipa nova depois de perder
 export const MAX_LINE = 150, MIN_LINE = 4;
+/* resistência da linha: arrebenta quando a tensão MÉDIA passa de breakN × LINE_STRENGTH
+   por BREAK_HOLD segundos seguidos (trancos rápidos de rajada não arrebentam) */
+export const LINE_STRENGTH = 1.45;
+export const BREAK_HOLD = .9;
 
 // grupos de colisão (Ammo)
 export const G_GROUND = 1, G_STATIC = 2, G_KITE = 4, G_TAIL = 8, G_STRAY = 16, G_BALL = 32;

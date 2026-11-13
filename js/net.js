@@ -11,7 +11,7 @@ export function serverURL() {
 }
 
 export class NetSession {
-  /** join = { create, room, name, style, kite } */
+  /** join = { create, random, room, scene, name, style, kite } */
   constructor(join, { onWelcome, onError }) {
     this.myId = null; this.label = ''; this.room = '';
     this.wind = DISPUTA_WIND;
@@ -40,6 +40,7 @@ export class NetSession {
         case 'welcome':
           welcomed = true;
           this.myId = m.id; this.room = m.room; this.label = 'Sala ' + m.room;
+          this.scene = m.scene || 'campinho'; // servidor antigo não manda: campinho
           this.sync(m.rt); this.round = m.round; this.scores = m.scores || [];
           for (const p of m.players) this.others.set(p.id, { meta: p, state: null });
           if (m.v !== PROTOCOL) this.events.push({ type: 'oldServer' });

@@ -5,7 +5,7 @@ import { MISSIONS, KITES, getPatterns, MAX_LINE, MIN_LINE, G_STRAY, G_GROUND, G_
 import { clamp, lerp, rand, lerpAngle, segDist } from './utils.js';
 import { windState } from './shared/wind.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, UP } from './physics.js';
-import { scene, camera, renderer, groundH, trees } from './scene.js';
+import { scene, camera, renderer, groundH, trees, SCN, collideWalk } from './scene.js';
 import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail } from './kite.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry } from './player.js';
 import { RemoteView, StrayView } from './remote.js';
@@ -14,6 +14,7 @@ import { toast, $ } from './hud.js';
 import { burst, coil, clearFx } from './fx.js';
 import { RESPAWN } from './config.js';
 import { Ads } from './platform.js';
+import { startAparada, clearAparadas } from './aparada.js';
 
 /* =========================================================
    Vento
@@ -87,11 +88,8 @@ export function updatePlayer(dt) {
   if (_mv.lengthSq() > 0) _mv.normalize().multiplyScalar(spd * (joyMag > .12 ? Math.min(1, joyMag * 1.15) : 1));
   P.vel.lerp(_mv, 1 - Math.exp(-10 * dt));
   pos.addScaledVector(P.vel, dt);
-  for (const t of trees) {
-    const dx = pos.x - t.x, dz = pos.z - t.z, d = Math.hypot(dx, dz), r = .8;
-    if (d < r && d > 0) { pos.x = t.x + dx / d * r; pos.z = t.z + dz / d * r; }
-  }
-  pos.x = clamp(pos.x, -29.5, 25.8); pos.z = clamp(pos.z, -52, 48);
+  collideWalk(pos, .45);
+  pos.x = clamp(pos.x, SCN.walk.x0, SCN.walk.x1); pos.z = clamp(pos.z, SCN.walk.z0, SCN.walk.z1);
   pos.y = groundH(pos.x, pos.z);
 
   // braço da linha aponta pra pipa
@@ -143,7 +141,9 @@ export function updateCamera(dt) {
       cam.look.lerp(_ad.copy(kp).addScaledVector(_rt, 2.2), 1 - Math.exp(-4 * dt));
     } else {
       const t = cam.orbit;
-      _tmp.set(pos.x + Math.sin(t) * 16, 4.5 + Math.sin(t * .7) * 1.5, pos.z + Math.cos(t) * 16);
+      const R = SCN.menuOrbit || 16; // na laje a câmera gira mais perto (senão entra na casa do vizinho)
+      _tmp.set(pos.x + Math.sin(t) * R, pos.y + 4.5 + Math.sin(t * .7) * 1.5, pos.z + Math.cos(t) * R);
+      _tmp.y = Math.max(_tmp.y, groundH(_tmp.x, _tmp.z) + 2.2);
       camera.position.lerp(_tmp, 1 - Math.exp(-2 * dt));
       cam.look.lerp(_ad.copy(kp).lerp(pos, .45), 1 - Math.exp(-3 * dt));
     }
@@ -244,7 +244,8 @@ function spawnRing(minH = 0) {
   const dirH = S.windDirH.clone().applyAxisAngle(UP, rand(-.75, .75));
   let r = rand(30, 65), e = rand(.45, 1.0);
   if (minH) { r = rand(58, 85); e = Math.max(e, Math.asin(Math.min(.95, (minH + 3) / r))); }
-  const pos = new THREE.Vector3().copy(P).addScaledVector(dirH, Math.cos(e) * r); pos.y = Math.max(12, Math.sin(e) * r + 1.3);
+  const pos = new THREE.Vector3().copy(P).addScaledVector(dirH, Math.cos(e) * r);
+  pos.y = Math.max(P.y + Math.max(12, Math.sin(e) * r + 1.3), groundH(pos.x, pos.z) + 11); // nunca dentro das casas
   const g = new THREE.Group();
   g.add(new THREE.Mesh(ringGeo, ringMat), new THREE.Mesh(new THREE.CircleGeometry(2.5, 18), discMat));
   g.position.copy(pos);
@@ -254,10 +255,13 @@ function spawnRing(minH = 0) {
 function clearRings() { for (const r of S.rings) scene.remove(r.g); S.rings.length = 0; }
 
 const KT = Object.keys(KITES);
+/** a minha linha, enquanto a pipa está voando (a aparada fica pendurada nela) */
+const myLine = () => (S.running && S.state === 'voando' && lineObj.visible ? lineObj : null);
 function spawnStray() {
   const A = PH.A, P = G.player.g.position;
   const side = new THREE.Vector3(-S.windDirH.z, 0, S.windDirH.x);
-  const p = new THREE.Vector3().copy(P).addScaledVector(S.windDirH, -55).addScaledVector(side, rand(-22, 22)); p.y = rand(26, 46);
+  const p = new THREE.Vector3().copy(P).addScaledVector(S.windDirH, -55).addScaledVector(side, rand(-22, 22));
+  p.y = Math.max(P.y + rand(26, 46), groundH(p.x, p.z) + 18);
   const type = KT[Math.floor(Math.random() * KT.length)];
   const pat = Math.floor(Math.random() * getPatterns(type).length);
   const st = { age: 0, ph: Math.random() * 10, caught: false, catchT: 0, stuck: false, stuckT: 0, dead: false, offset: new THREE.Vector3() };
@@ -265,7 +269,8 @@ function spawnStray() {
   st.body.setGravity(new A.btVector3(0, 0, 0));
   st.body.setDamping(.1, .9); st.body.setActivationState(4);
   st.body.setAngularFactor(new A.btVector3(0, 0, 0));
-  st.view = new StrayView({ type, pat });
+  st.kite = { type, pat };
+  st.view = new StrayView(st.kite);
   S.strays.push(st);
   toast('Pipa avoada!', 'Vem vindo do alto, pelas costas. Apare com a linha!', 'good', 2.2);
 }
@@ -381,17 +386,22 @@ export function updateLogic(dt) {
     getPos(st.body, _tmp);
     st.view.set([_tmp.x, _tmp.y, _tmp.z]);
     st.view.update(dt, S.clock, S.windDirH);
-    if (st.caught) {
-      st.catchT += dt;
-      if (st.catchT > 1.4) {
-        removeStray(st); S.strays.splice(i, 1);
-        burst(_tmp, '#06d6a0', 'APAROU! +150');
-        S.score += 150; toast('Aparou!', 'Pipa nova pra coleção. +150', 'good', 1.8); Snd.ring(); Snd.ring(1.5);
-        if (m && !S.missionDone && m.type === 'aparar') { S.mp++; if (S.mp >= m.goal) completeMission(); }
-      }
-    } else if (S.state === 'voando' && (segDist(_tmp, S.hand, kp) < 1.7 || _tmp.distanceTo(kp) < 2.6)) {
-      st.caught = true; st.catchT = 0; st.offset.set(rand(-.8, .8), -1.2, rand(-.5, .5));
+    if (S.state === 'voando' && (segDist(_tmp, S.hand, kp) < 1.7 || _tmp.distanceTo(kp) < 2.6)) {
+      // encostou: a avoada gruda na minha linha e fica pendurada 6 s; depois vem o aviso e os pontos
+      const kite = st.kite, from = _tmp.clone();
+      removeStray(st); S.strays.splice(i, 1);
       Snd.beep(660, .12, 'triangle', .15);
+      startAparada({
+        kite, from, line: myLine,
+        onArrive: p => {
+          if (!S.running) return;
+          burst(p.setY(p.y + .8), '#06d6a0', 'APAROU! +150');
+          S.score += 150; toast('Aparou!', 'Pipa nova pra coleção. +150', 'good', 1.8); Snd.ring(); Snd.ring(1.5);
+          const mm = curMission();
+          if (mm && !S.missionDone && mm.type === 'aparar') { S.mp++; if (S.mp >= mm.goal) completeMission(); }
+        },
+        onDrop: () => { if (S.running) toast('A aparada caiu!', 'Sua linha soltou antes dela chegar', 'bad', 1.6); },
+      });
     } else {
       if (st.stuck) st.stuckT += dt;
       if (st.dead || st.stuckT > 4 || st.age > 75 || _tmp.y < .7) { removeStray(st); S.strays.splice(i, 1); }
@@ -534,11 +544,29 @@ function handleEvent(ss, e) {
     case 'duelDraw':
       if (e.a === me || e.b === me) toast('Desenroscou!', 'Ninguém levou', '', 1.5);
       break;
-    case 'catch':
-      if (e.p) burst(new THREE.Vector3().fromArray(e.p), '#06d6a0', e.by === me ? 'APAROU! +50' : ss.nameOf(e.by) + ' aparou');
-      if (e.by === me) { toast('Aparou!', '+50', 'good', 1.5); Snd.ring(); }
-      else toast(ss.nameOf(e.by) + ' aparou uma avoada', '', '', 1.4);
+    case 'catch': {
+      // a avoada gruda na linha de quem aparou e fica pendurada 6 s; depois vem o aviso
+      const sv = G.strayViews.get(e.id);
+      const kite = e.kite || (sv && sv.kite) || { type: 'pipa', pat: 0 };
+      if (sv) { sv.dispose(); G.strayViews.delete(e.id); }
+      const mine = e.by === me, who = e.by;
+      const line = mine ? myLine : () => {
+        const r = G.remotes.get(who), st = ss.others.get(who)?.state;
+        return r && r.line.visible && st && st.flying ? r.line : null;
+      };
+      const from = e.p ? new THREE.Vector3().fromArray(e.p) : (mine ? S.kitePos.clone() : new THREE.Vector3());
+      if (mine) Snd.beep(660, .12, 'triangle', .15);
+      startAparada({
+        kite, from, line,
+        onArrive: p => {
+          if (!S.running || G.session !== ss) return;
+          burst(p.setY(p.y + .8), '#06d6a0', mine ? 'APAROU! +50' : ss.nameOf(who) + ' aparou');
+          if (mine) { toast('Aparou!', '+50', 'good', 1.5); Snd.ring(); }
+          else toast(ss.nameOf(who) + ' aparou uma avoada', '', '', 1.4);
+        },
+      });
       break;
+    }
     case 'strayIn': toast('Pipa avoada no céu!', 'Encoste a linha nela', 'good', 1.8); break;
     case 'round':
       if (e.round.state === 'pause') {
@@ -572,14 +600,14 @@ function clearDisputa() {
    Início, pausa, fim
    ========================================================= */
 export function startGame(mode, session = null) {
-  clearRings(); clearStrays();
+  clearRings(); clearStrays(); clearAparadas();
   if (G.session && G.session !== session) clearDisputa();
   S.mode = mode;
   G.session = session;
   S.score = 0; S.scoreFrac = 0; S.mi = 0; S.mp = 0; S.missionDone = false; S.ended = false; S.stamina = 1;
   S.minutes = mode === 'desafios' ? 16 * 60 : mode === 'livre' ? 16.5 * 60 : 17.2 * 60;
   const P = G.player;
-  if (session && session.myId !== 'eu') P.g.position.set(rand(-10, 10), 0, rand(18, 26)); else P.g.position.set(0, 0, 22);
+  placePlayer(session && session.myId !== 'eu');
   P.vel.set(0, 0, 0);
   cam.yawOff = 0; cam.pitch = .14; cam.yawSm = Math.PI;
   if (session) { S.windBase = DISPUTA_WIND.base; S.gustAmp = DISPUTA_WIND.gust; }
@@ -595,7 +623,19 @@ export function startGame(mode, session = null) {
   Ads.gameplayStart();
   if (session && session.room) Ads.room(session.room);
   if (session) toast(session.label, mode === 'online' ? 'Passe o código ' + session.room + ' pra turma' : 'Cruze a linha na deles pra enroscar', 'good', 3.5);
-  camera.position.set(P.g.position.x, 3.5, P.g.position.z + 7);
+  camera.position.set(P.g.position.x, P.g.position.y + 3.5, P.g.position.z + 7);
+}
+
+/** põe o jogador num ponto de saída do cenário (online: um ponto qualquer, para não nascer em cima de ninguém) */
+export function placePlayer(randomSpot = false) {
+  const P = G.player, sp = SCN.spawns;
+  const [x, z] = randomSpot ? sp[Math.floor(Math.random() * sp.length)] : sp[0];
+  const j = randomSpot ? .8 : 0;
+  P.g.position.set(x + rand(-j, j), 0, z + rand(-j, j));
+  P.g.position.x = clamp(P.g.position.x, SCN.walk.x0, SCN.walk.x1); P.g.position.z = clamp(P.g.position.z, SCN.walk.z0, SCN.walk.z1);
+  P.g.position.y = groundH(P.g.position.x, P.g.position.z);
+  P.vel.set(0, 0, 0);
+  P.yaw = Math.PI;
 }
 
 /* menu entra e sai com transição (o CSS cuida da animação) */
@@ -613,7 +653,7 @@ function showMenu() {
 
 export function toMenu() {
   S.running = false; S.paused = false; S.ended = false;
-  clearRings(); clearStrays(); clearDisputa();
+  clearRings(); clearStrays(); clearDisputa(); clearAparadas();
   S.mode = 'livre'; S.windBase = 5.8; S.gustAmp = .35;
   $('pause').classList.add('hidden'); $('end').classList.add('hidden'); $('hud').classList.add('hidden'); showMenu();
   resetKite(); S.L = 30;

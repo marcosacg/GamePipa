@@ -2,21 +2,22 @@
 import { S, G, keys } from './state.js';
 import { AMMO_BASE, H, KITES } from './config.js';
 import { PH, initPhysics } from './physics.js';
-import { renderer, scene, camera, updateSky, followCamera } from './scene.js';
-import { buildWorld, updateEnvironment } from './world.js';
+import { renderer, scene, camera, updateSky, followCamera, SCN, groundH } from './scene.js';
+import { buildWorld, updateEnvironment, setScenario, currentScenario, SCENE_LIST, lastBuild } from './world.js';
 import { buildKite, resetKite, kitePhysicsStep, syncKiteVisual, lastApparent, putOnBack, launchKite } from './kite.js';
 import { updateHUD, $ } from './hud.js';
-import { buildMenu, enablePlay, setNetMsg } from './menu.js';
+import { buildMenu, enablePlay, setNetMsg, showScene } from './menu.js';
 import { Snd } from './audio.js';
 import { updateFx } from './fx.js';
 import { initNPCs, updateNPCs } from './npcs.js';
+import { updateAparadas } from './aparada.js';
 import { isTouch, initTouch, updateTouch, goFullscreen } from './touch.js';
 import { LocalSession } from './bots.js';
 import { NetSession, serverURL } from './net.js';
 import { Ads } from './platform.js';
 import {
   cam, updateWind, updatePlayer, updateCamera, updateLogic, strayForces, setPlayerStyle, setKite,
-  startGame, toMenu, setPause, continueFree, advanceClockKey,
+  startGame, toMenu, setPause, continueFree, advanceClockKey, placePlayer,
 } from './game.js';
 
 /* ---------------- menu ---------------- */
@@ -26,22 +27,54 @@ buildMenu({
     if (!ready) return;
     goFullscreen();
     await Ads.commercialBreak('inicio'); // o Poki pede um intervalo antes de começar a jogar
-    if (mode === 'disputa') startGame('disputa', new LocalSession({ name: S.name, style: S.style, kite: { type: S.kiteType, pat: S.patIdx } }));
+    if (mode === 'disputa') startGame('disputa', new LocalSession({ name: S.name, style: S.style, kite: { type: S.kiteType, pat: S.patIdx } }, 3,
+      { bases: SCN.bots, ground: groundH, walk: SCN.walk }));
     else startGame(mode);
   },
   online(create, code, random = false) {
     if (!ready) return;
     goFullscreen();
-    const join = { create, random, room: code, name: S.name, style: S.style, kite: { type: S.kiteType, pat: S.patIdx } };
+    const join = { create, random, room: code, scene: S.scene, name: S.name, style: S.style, kite: { type: S.kiteType, pat: S.patIdx } };
     new NetSession(join, {
-      onWelcome: ss => { setNetMsg(''); ss.onTick = backgroundTick; startGame('online', ss); },
+      onWelcome: async ss => {
+        setNetMsg('');
+        ss.onTick = backgroundTick;
+        if (ss.scene !== currentScenario()) { showScene(ss.scene); await switchScenario(ss.scene); } // vai para o cenário da sala
+        ss.label += ' · ' + (SCENE_LIST.find(s => s.id === ss.scene)?.nome || '');
+        startGame('online', ss);
+      },
       onError: msg => setNetMsg(msg, true),
     });
   },
   styleChanged(style) { if (ready) setPlayerStyle(style); },
   kiteChanged(type, pat) { if (ready) setKite(type, pat); },
   view(tab) { cam.menuView = tab; },
+  scene(id) { if (ready) switchScenario(id); },
 });
+
+/* ---------------- troca de cenário (com a tela escurecendo rapidinho) ---------------- */
+let switching = null;
+function switchScenario(id) {
+  if (switching) return switching.then(() => switchScenario(id));
+  if (currentScenario() === id) return Promise.resolve();
+  const fade = $('fade');
+  $('fadeText').textContent = 'Indo para ' + (id === 'laje' ? 'a laje' : id === 'morro' ? 'o morro' : 'o campinho') + '…';
+  fade.classList.add('on');
+  switching = new Promise(res => setTimeout(() => {   // espera escurecer, monta, e clareia
+    try {
+      setScenario(id);
+      window.__buildMs = lastBuild; // só para conferência (testes)
+      placePlayer();
+      updateWind(); updatePlayer(0);
+      initNPCs();
+      resetKite(); S.L = 30;
+      const p = G.player.g.position;
+      camera.position.set(p.x, p.y + 3, p.z + 8); cam.look.set(p.x, p.y + 6, p.z - 10);
+    } catch (e) { console.error(e); }
+    requestAnimationFrame(() => requestAnimationFrame(() => { fade.classList.remove('on'); switching = null; res(); }));
+  }, 280));
+  return switching;
+}
 
 $('resumeBtn').onclick = () => setPause(false);
 $('menuBtn1').onclick = $('menuBtn2').onclick = () => toMenu();
@@ -90,6 +123,7 @@ function step(now) {
     updateLogic(dt);
     updateFx(dt);
     updateNPCs(dt, S.clock);
+    updateAparadas(dt, S.clock, S.windDirH);
   }
   return dt;
 }
@@ -129,9 +163,10 @@ function loadAmmo() {
 
 loadAmmo().then(({ lib }) => {
   initPhysics(lib);
-  buildWorld();
+  S.scene = buildWorld(S.scene);
   initNPCs();
   setPlayerStyle(S.style);
+  placePlayer();
   updateWind();
   updatePlayer(0);
   if (!KITES[S.kiteType]) S.kiteType = 'pipa';

@@ -53,6 +53,7 @@ const copyDir = (src, dst, filter = () => true) => {
 // js/tools e js/models.js só servem às ferramentas (vitrine/exportar Assets): ficam fora do pacote
 copyDir(path.join(ROOT, 'js'), path.join(OUT, 'js'), (s, e) => !(e.isDirectory() && e.name === 'tools') && e.name !== 'models.js');
 copyDir(path.join(ROOT, 'css'), path.join(OUT, 'css'));
+copyDir(path.join(ROOT, 'img'), path.join(OUT, 'img')); // miniaturas dos cenários
 copyDir(VENDOR_DIR, path.join(OUT, 'vendor'), (s, e) => e.isDirectory() || Object.keys(VENDOR).some(rel => s.endsWith(path.join(...rel.split('/')))));
 let html = fs.readFileSync(path.join(ROOT, 'rabiola.html'), 'utf8');
 fs.writeFileSync(path.join(OUT, 'index.html'), html);

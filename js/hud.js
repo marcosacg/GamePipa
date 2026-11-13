@@ -1,6 +1,6 @@
 // HUD: painéis, avisos, enroscada e placar
 import { S, G } from './state.js';
-import { MISSIONS, MAX_LINE } from './config.js';
+import { MISSIONS, MAX_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
 import { clamp } from './utils.js';
 import { sunElev } from './scene.js';
 import { RESPAWN } from './config.js';
@@ -35,6 +35,7 @@ const TIPS_DUEL = [
 ];
 
 let hudT = 0, tipT = 0, tipI = 0;
+let lineWarned = false;
 export function updateHUD(dt, camYaw) {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').className = ''; }
   // contagem para soltar outra pipa
@@ -56,10 +57,18 @@ export function updateHUD(dt, camYaw) {
   $('hScore').textContent = disputa ? myScore() : S.score;
   const stTxt = { voando: S.tension < .25 ? 'Linha bamba' : (S.pulling ? 'Puxando' : 'Voando'), costas: 'Nas costas', lancando: 'Soltando…', enroscou: 'Enroscou', caiu: 'Caiu', arrebentou: S.hideKite ? 'Laçada!' : 'Avoou!' }[S.state];
   $('hState').textContent = stTxt;
-  const tr = clamp(S.tension / kt.breakN, 0, 1);
+  // a barra mostra o esforço da linha até o limite; no vermelho, pisca e avisa antes de arrebentar
+  const tr = clamp(Math.max(S.stress || 0, S.tension * .85) / (kt.breakN * LINE_STRENGTH), 0, 1);
   const bar = $('tensionBar').firstElementChild;
   bar.style.width = (tr * 100).toFixed(0) + '%';
-  bar.style.background = tr > .8 ? '#e63946' : tr > .55 ? '#ffd166' : '#06d6a0';
+  const danger = S.state === 'voando' && S.overT > 0;
+  bar.style.background = danger || tr > .9 ? '#e63946' : tr > .65 ? '#ffd166' : '#06d6a0';
+  $('tensionBar').classList.toggle('perigo', danger);
+  if (danger && S.overT > BREAK_HOLD * .25 && !lineWarned && S.running) {
+    lineWarned = true;
+    toast('A linha vai arrebentar!', 'Dê linha ou pare de puxar', 'bad', 1.6);
+  }
+  if (!danger) lineWarned = false;
   $('hTen').textContent = S.tension.toFixed(1) + ' N';
   $('hWind').textContent = (S.windSpeed * 3.6).toFixed(0);
   $('hGust').textContent = S.windSpeed > S.windBase * 1.25 ? 'RAJADA' : S.windSpeed < S.windBase * .7 ? 'calmaria' : '';
