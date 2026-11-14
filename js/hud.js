@@ -30,8 +30,8 @@ const TIPS_DUEL = [
   'Na enroscada: W puxa (gasta fôlego), S dá linha. Pipa por cima leva vantagem.',
   'Não puxe com a tensão no vermelho: a sua linha arrebenta primeiro!',
   'Pipa laçada vira avoada: encoste a linha nela para aparar (+50).',
-  'Passe a linha na rabiola do outro: você começa a enroscada na frente e puxa mais forte.',
-  'Pegaram sua rabiola? Sacuda com A/D alternado: dar linha quase não adianta.',
+  'Prendeu a rabiola do outro? Encoste sua linha na dele: ele perde na hora e você apara a pipa.',
+  'Pegaram sua rabiola? Afaste e sacuda com A/D, e não deixe as linhas encostarem!',
 ];
 
 let hudT = 0, tipT = 0, tipI = 0;
@@ -137,9 +137,9 @@ function updateDisputaHUD() {
     const mine = d.a === ss.myId ? d.prog : -d.prog; // -1..1, positivo = ganhando
     const other = d.a === ss.myId ? d.b : d.a;
     const name = ss.nameOf(other);
-    if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na linha dele pra disputar'; }
-    else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola prendeu na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> afaste a pipa pra esticar · sacudir ajuda · <b>não encoste a linha</b>'; }
-    else { $('duelTitle').textContent = d.att === ss.myId ? 'ENROSCADA (na rabiola dele!) com' : d.att ? 'ENROSCADA (ele pegou sua rabiola) com' : 'ENROSCADA com'; $('duelKeys').innerHTML = '<kbd>W</kbd> puxa · <kbd>S</kbd> dá linha'; }
+    if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na dele: ele perde e você <b>apara</b>'; }
+    else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola prendeu na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> afaste a pipa pra esticar · sacudir ajuda · <b>se as linhas encostarem, perde!</b>'; }
+    else { $('duelTitle').textContent = 'ENROSCADA com'; $('duelKeys').innerHTML = '<kbd>W</kbd> puxa · <kbd>S</kbd> dá linha'; }
     $('duelName').textContent = name;
     $('duel').classList.toggle('tail', d.kind === 'rabiola');
     if (d.kind === 'rabiola') {

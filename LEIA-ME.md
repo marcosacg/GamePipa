@@ -42,7 +42,10 @@ No **online**, vale o cenário de quem **criou** a sala: quem entra com código 
   - Linha firme ajuda e pipa por cima leva vantagem.
 - **Rabiola presa:** se a sua linha passar na rabiola do outro, a rabiola dele fica presa na sua linha,
   mas **ninguém perde só por isso**:
-  - Quem prendeu precisa **encostar a linha dele na linha do outro**. Aí vira enroscada de verdade, e ele começa na frente.
+  - Se a **linha** de quem prendeu **encostar na linha** do outro, quem teve a rabiola presa **perde na hora**.
+    A pipa dele não vira avoada: fica **pendurada pela rabiola** na linha de quem ganhou por 6 segundos,
+    e aí vem o "Aparou!" (+100 da laçada +50 da aparada). Vale também no meio de uma enroscada de linha:
+    se uma linha pegar a rabiola da outra, acabou.
   - Quem foi preso **afasta a pipa da linha do outro** (A/D). A rabiola estica e vai **escorregando** até soltar pela ponta.
     Sacudir ajuda. Depois de 25 s ela solta sozinha.
 - **Pipa nas costas:** você começa (e volta depois de perder) com a pipa nas costas. Ande à vontade e aperte **E** para soltar.

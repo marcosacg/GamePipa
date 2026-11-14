@@ -82,8 +82,9 @@ class Hanging {
       this.v = Math.min(.8, this.v + .6 * dt); // escorrega bem devagar pela linha, balançando (dura os 6 s)
       this.f -= this.v * dt / L;
     }
+    this.f = Math.max(this.f, Math.min(.5, 2 / L)); // para a uns 2 m da mão: fica sempre os 6 s pendurada
     lineAt(line, this.f, this.hook);
-    if (this.t >= DURACAO || this.f * L < 1.4) { this.arrive(); return false; }
+    if (this.t >= DURACAO) { this.arrive(); return false; }
 
     // pipa pendurada: ponto com massa preso no gancho por um pedaço de linha (balança sozinha)
     _w.copy(windDirH).multiplyScalar(4.5);

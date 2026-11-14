@@ -257,6 +257,38 @@ function clearRings() { for (const r of S.rings) scene.remove(r.g); S.rings.leng
 const KT = Object.keys(KITES);
 /** a minha linha, enquanto a pipa está voando (a aparada fica pendurada nela) */
 const myLine = () => (S.running && S.state === 'voando' && lineObj.visible ? lineObj : null);
+/** a linha de um jogador (eu ou outro), para pendurar a pipa aparada */
+function lineOf(ss, who, me) {
+  if (who === me) return myLine;
+  return () => {
+    const r = G.remotes.get(who), st = ss.others.get(who)?.state;
+    return r && r.line.visible && st && st.flying ? r.line : null;
+  };
+}
+
+/* Rabiola presa + linhas encostando: quem teve a rabiola pega perdeu na hora. A pipa dele não vira
+   avoada: fica 6 s pendurada pela rabiola na linha de quem ganhou, e só então vem o aviso de "Aparou!". */
+function duelAparada(ss, e, me) {
+  const lv = G.remotes.get(e.loser);
+  if (lv) lv.markLost();                       // a pipa dele some do céu (agora está pendurada)
+  const won = e.winner === me, lost = e.loser === me;
+  if (lost) failKite('lacada');                // a minha some e vou para a espera
+  if (won || lost) { cam.shake = .5; flashDuel(); Snd.tangle(); }
+  if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#ffffff', 'PEGOU NA RABIOLA!');
+  const kite = e.kite || { type: 'pipa', pat: 0 };
+  const from = e.k ? new THREE.Vector3().fromArray(e.k) : new THREE.Vector3().fromArray(e.x || [0, 20, 0]);
+  const wName = ss.nameOf(e.winner), lName = ss.nameOf(e.loser);
+  startAparada({
+    kite, from, line: lineOf(ss, e.winner, me),
+    onArrive: p => {
+      if (!S.running || G.session !== ss) return;
+      burst(p.setY(p.y + .8), '#06d6a0', won ? 'APAROU! +150' : wName + ' aparou');
+      if (won) { toast('Aparou a pipa de ' + lName + '!', 'Pegou na rabiola e na linha · +150', 'good', 2.6); Snd.win(); Snd.ring(1.5); }
+      else if (lost) { toast(wName + ' aparou sua pipa!', 'Sua rabiola enroscou na linha dele', 'bad', 2.6); Snd.fail(); }
+      else toast(wName + ' aparou a pipa de ' + lName, '', '', 1.8);
+    },
+  });
+}
 function spawnStray() {
   const A = PH.A, P = G.player.g.position;
   const side = new THREE.Vector3(-S.windDirH.z, 0, S.windDirH.x);
@@ -508,13 +540,14 @@ function handleEvent(ss, e) {
       if (e.a === me || e.b === me) {
         cam.shake = .35; flashDuel();
         const other = ss.nameOf(e.a === me ? e.b : e.a);
-        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Encoste a sua linha na dele pra valer a disputa', 'good', 2.6);
-        else if (e.kind === 'rabiola') toast('Sua rabiola prendeu na linha de ' + other + '!', 'Afaste a pipa (A/D) pra esticar e escorregar · não encoste a linha!', 'bad', 3);
+        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Encoste a sua linha na dele: ele perde na hora e você apara', 'good', 2.6);
+        else if (e.kind === 'rabiola') toast('Sua rabiola prendeu na linha de ' + other + '!', 'Afaste a pipa (A/D) pra escorregar · se as linhas encostarem, você perde!', 'bad', 3);
         else toast('Enroscou com ' + other + '!', 'W puxa (gasta fôlego) · S dá linha', 'good', 2.4);
         Snd.tangle();
       }
       break;
     case 'duelEnd': {
+      if (e.aparada) { duelAparada(ss, e, me); break; }
       // a linha do perdedor arrebenta no ponto da enroscada e a pipa dele vira avoada
       if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#e63946', 'ARREBENTOU!', true);
       const lp = kitePosOf(ss, e.loser);
@@ -529,14 +562,6 @@ function handleEvent(ss, e) {
       } else toast(ss.nameOf(e.winner) + ' laçou ' + ss.nameOf(e.loser), '', '', 1.6);
       break;
     }
-    case 'lineTouch':
-      if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#ffffff', 'ENROSCOU!');
-      if (e.a === me || e.b === me) {
-        cam.shake = .35; flashDuel(); Snd.tangle();
-        if (e.att === me) toast('As linhas encostaram!', 'Agora vale: W puxa forte (rabiola dele presa)', 'good', 2.4);
-        else toast('As linhas encostaram!', 'Agora é disputa: W puxa · S dá linha', 'bad', 2.4);
-      }
-      break;
     case 'tailFree':
       if (e.vic === me) { toast('A rabiola escorregou e soltou!', 'Escapou dessa', 'good', 2); Snd.ring(.8); }
       else if (e.att === me) toast('A rabiola de ' + ss.nameOf(e.vic) + ' escapou', '', '', 1.8);
@@ -550,10 +575,7 @@ function handleEvent(ss, e) {
       const kite = e.kite || (sv && sv.kite) || { type: 'pipa', pat: 0 };
       if (sv) { sv.dispose(); G.strayViews.delete(e.id); }
       const mine = e.by === me, who = e.by;
-      const line = mine ? myLine : () => {
-        const r = G.remotes.get(who), st = ss.others.get(who)?.state;
-        return r && r.line.visible && st && st.flying ? r.line : null;
-      };
+      const line = lineOf(ss, who, me);
       const from = e.p ? new THREE.Vector3().fromArray(e.p) : (mine ? S.kitePos.clone() : new THREE.Vector3());
       if (mine) Snd.beep(660, .12, 'triangle', .15);
       startAparada({

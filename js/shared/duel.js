@@ -14,7 +14,7 @@ export const DUEL = {
   cooldown: 4,       // tempo até o mesmo par poder enroscar de novo
   catchDist: 1.8,    // distância para aparar uma avoada com a linha
   tailTouch: 1.4,    // distância da linha até a rabiola do outro para "pegar a rabiola"
-  tailBias: 0.25,    // se as linhas encostarem com a rabiola presa, quem prendeu começa na frente
+  aparadaBonus: 50,  // rabiola presa + linhas encostando: quem prendeu ganha na hora e ainda apara a pipa
   slideRate: 0.45,   // quanto a rabiola escorrega por metro esticado, por segundo
   shakeSlide: 0.15,  // sacudir (A/D) ajuda a rabiola a escorregar
   snagTime: 25,      // tempo máximo com a rabiola presa (depois ela escapa sozinha)
@@ -155,15 +155,18 @@ export class Arena {
     for (let i = this.duels.length - 1; i >= 0; i--) {
       const d = this.duels[i];
       const A = this.players.get(d.a), B = this.players.get(d.b);
-      const end = (w, l) => {
+      /* aparada = true: a rabiola do perdedor estava presa na linha do vencedor quando as linhas encostaram.
+         Ele perde na hora e a pipa dele não vira avoada: fica pendurada pela rabiola na linha de quem ganhou. */
+      const end = (w, l, aparada = false) => {
         this.duels.splice(i, 1);
         this.cool.set(key(d.a, d.b), DUEL.cooldown);
         if (w) {
           const Wp = this.players.get(w), Lp = this.players.get(l);
-          if (Wp) { Wp.score += 100; Wp.lacadas++; }
+          if (Wp) { Wp.score += 100; Wp.lacadas++; if (aparada) { Wp.score += DUEL.aparadaBonus; Wp.aparadas++; } }
           if (Lp) Lp.lostUntil = t + DUEL.lostTime;
-          if (Lp && Lp.s && Lp.s.k[1] > 2) this.spawnStray(Lp.s.k, Lp.kite, l);
-          ev.push({ type: 'duelEnd', winner: w, loser: l, x: d.x, kind: d.kind });
+          if (!aparada && Lp && Lp.s && Lp.s.k[1] > 2) this.spawnStray(Lp.s.k, Lp.kite, l);
+          ev.push({ type: 'duelEnd', winner: w, loser: l, x: d.x, kind: d.kind, aparada,
+            k: Lp && Lp.s ? Lp.s.k.slice() : null, kite: Lp ? Lp.kite : null });
         } else ev.push({ type: 'duelDraw', a: d.a, b: d.b });
       };
       if (!A || !B) { end(null); continue; }
@@ -171,7 +174,8 @@ export class Arena {
       if (d.kind === 'rabiola') {
         /*
           RABIOLA PRESA: ninguém perde só por isso.
-          - Se as LINHAS também se encostarem, vira enroscada de verdade (quem prendeu leva vantagem).
+          - Se as LINHAS também se encostarem, quem teve a rabiola presa PERDE NA HORA
+            e a pipa dele fica pendurada (aparada) na linha de quem prendeu.
           - Se a vítima afastar a pipa da linha do outro, a rabiola estica e vai escorregando até soltar.
         */
         if (!fa || !fb) { end(null); continue; } // alguém caiu por conta própria: só desprende
@@ -180,10 +184,8 @@ export class Arena {
         if (!ts) { end(null); continue; }
         const rl = segSeg(A.s.hand, A.s.k, B.s.hand, B.s.k);
         if (rl.d < DUEL.touch && rl.s > DUEL.minFrac && rl.s < DUEL.maxFrac && rl.t > DUEL.minFrac && rl.t < DUEL.maxFrac) {
-          d.kind = 'linha'; d.t = 0; d.f = 0;
-          d.prog = d.att === d.a ? DUEL.tailBias : -DUEL.tailBias;
           d.x = [(rl.c1[0] + rl.c2[0]) / 2, (rl.c1[1] + rl.c2[1]) / 2, (rl.c1[2] + rl.c2[2]) / 2];
-          ev.push({ type: 'lineTouch', a: d.a, b: d.b, att: d.att, x: d.x });
+          end(att.id, vic.id, true);
           continue;
         }
         const tv = sub(ts[1], ts[0]);
@@ -213,6 +215,8 @@ export class Arena {
         // durante a enroscada de linha, encostar na rabiola do outro dá vantagem
         const ta = lineOnTail(A, B, DUEL.tailTouch * 1.3), tb = lineOnTail(B, A, DUEL.tailTouch * 1.3);
         d.att = ta && !tb ? d.a : tb && !ta ? d.b : null;
+        // linha com linha E a linha pegou a rabiola do outro: ele perde na hora (e a pipa dele é aparada)
+        if (d.att) { end(d.att, d.att === d.a ? d.b : d.a, true); continue; }
       }
       const roleA = d.att === d.a ? 'att' : d.att === d.b ? 'vic' : null;
       const roleB = d.att === d.b ? 'att' : d.att === d.a ? 'vic' : null;
