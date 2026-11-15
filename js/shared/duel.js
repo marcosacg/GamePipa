@@ -9,19 +9,19 @@ export const DUEL = {
   minFrac: 0.12,     // não enrosca colado na mão...
   maxFrac: 0.97,     // ...nem exatamente na pipa
   minLine: 8,        // linha mínima para entrar em disputa
-  maxTime: 15,       // depois disso as linhas desenroscam (empate)
-  speed: 0.45,       // velocidade do cabo de guerra
-  centro: 0.35,      // a enroscada "puxa" de volta pro meio: só ganha quem mantém vantagem de verdade
-  folego: 1.0,       // segurar a mesma tecla (W ou S) rende 100% por esse tempo (s)...
-  cansa: 1.5,        // ...e depois vai caindo até 20% nesse tempo: o certo é alternar puxada e relo
+  maxTime: 18,       // depois disso as linhas desenroscam (empate)
+  speed: 0.6,        // velocidade do cabo de guerra
+  centro: 0.1,       // a enroscada "puxa" de volta pro meio: só ganha quem mantém vantagem de verdade
+  folego: 1.5,       // segurar a mesma tecla (W ou S) rende 100% por esse tempo (s)...
+  cansa: 2.0,        // ...e depois vai caindo até 35% nesse tempo: o certo é alternar puxada e relo
   linhaLonga: 0.25,  // linha muito comprida responde mais devagar (até -25% na puxada/relo, de 35 m a 100 m)
-  dangerTime: 6,     // rabiola presa + linhas encostadas: tempo (s) que a vítima tem para escapar antes de ser aparada
+  dangerTime: 3,     // rabiola presa + linhas encostadas: tempo (s) que a vítima tem para escapar antes de ser aparada
   dangerCool: 1.5,   // com as linhas afastadas, o contador volta nessa velocidade
   dangerGrip: 0.35,  // com as linhas encostadas a rabiola fica mais enrolada: escorrega só 35%
   cooldown: 4,       // tempo até o mesmo par poder enroscar de novo
   catchDist: 1.8,    // distância para aparar uma avoada com a linha
   tailTouch: 1.4,    // distância da linha até a rabiola do outro para "pegar a rabiola"
-  aparadaBonus: 50,  // rabiola presa + linhas encostadas por 6 s: quem prendeu ganha e ainda apara a pipa
+  aparadaBonus: 50,  // rabiola presa + linhas encostadas por 3 s: quem prendeu ganha e ainda apara a pipa
   slideRate: 0.45,   // quanto a rabiola escorrega por metro esticado, por segundo
   shakeSlide: 0.15,  // sacudir (A/D) ajuda a rabiola a escorregar
   snagTime: 25,      // tempo máximo com a rabiola presa (depois ela escapa sozinha)
@@ -34,7 +34,7 @@ export const DUEL = {
 export const KITE_TYPES = ['pipa', 'raia', 'capucheta', 'bico', 'quadrada'];
 
 // versão das regras/mensagens: se o servidor rodando for mais velho que os arquivos, o jogo avisa
-export const PROTOCOL = 8; // 8: contagem de 6 s na rabiola presa (dg) e enroscada equilibrada
+export const PROTOCOL = 8; // 8: contagem de 3 s na rabiola presa (dg) e enroscada equilibrada
 export const SCENES = ['campinho', 'laje', 'morro'];
 
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -90,11 +90,11 @@ export function tailEndFromWind(k, W, n) {
  * - todo mundo parte da mesma base; a tensão da linha e a altura da pipa ajudam só um pouquinho
  * - puxar (W) é o golpe forte, mas gasta fôlego
  * - dar linha (S) faz o "relo" e também ajuda
- * - segurar a mesma tecla perde efeito depois de 1 s: ganha quem alterna puxada e relo no ritmo
+ * - segurar a mesma tecla perde efeito depois de 1,5 s: ganha quem alterna puxada e relo no ritmo
  * - linha muito comprida responde mais devagar (não adianta só soltar linha e ficar longe)
  * h = { p, g }: há quanto tempo ele está segurando a puxada / o relo
  */
-const fresh = hold => cl(1 - (hold - DUEL.folego) / DUEL.cansa, 0.2, 1);
+const fresh = hold => cl(1 - (hold - DUEL.folego) / DUEL.cansa, 0.35, 1);
 export function duelPower(p, o, h = null) {
   let pw = 0.7 + 0.15 * cl((p.T || 0) / (p.breakN || 30), 0, 1);
   const resp = 1 - DUEL.linhaLonga * cl(((p.L || 0) - 35) / 65, 0, 1);
@@ -168,7 +168,7 @@ export class Arena {
     for (let i = this.duels.length - 1; i >= 0; i--) {
       const d = this.duels[i];
       const A = this.players.get(d.a), B = this.players.get(d.b);
-      /* aparada = true: a rabiola do perdedor ficou presa na linha do vencedor com as linhas encostadas por 6 s.
+      /* aparada = true: a rabiola do perdedor ficou presa na linha do vencedor com as linhas encostadas por 3 s.
          A pipa dele não vira avoada: fica pendurada pela rabiola na linha de quem ganhou. */
       const end = (w, l, aparada = false) => {
         this.duels.splice(i, 1);
@@ -187,7 +187,7 @@ export class Arena {
       if (d.kind === 'rabiola') {
         /*
           RABIOLA PRESA: ninguém perde só por isso.
-          - Se as LINHAS também se encostarem, começa uma contagem de 6 s (PERIGO). Se as linhas ficarem
+          - Se as LINHAS também se encostarem, começa uma contagem de 3 s (PERIGO). Se as linhas ficarem
             encostadas até o fim, quem teve a rabiola presa perde e a pipa dele fica pendurada (aparada)
             na linha de quem prendeu.
           - Para escapar: afastar as linhas (a contagem volta) e esticar/sacudir a rabiola até ela soltar.
@@ -235,7 +235,7 @@ export class Arena {
       {
         const r = segSeg(A.s.hand, A.s.k, B.s.hand, B.s.k);
         d.x = [(r.c1[0] + r.c2[0]) / 2, (r.c1[1] + r.c2[1]) / 2, (r.c1[2] + r.c2[2]) / 2];
-        // linha com linha E a linha pegou a rabiola do outro: vira "rabiola presa" e começa a contagem de 6 s
+        // linha com linha E a linha pegou a rabiola do outro: vira "rabiola presa" e começa a contagem de 3 s
         const ta = lineOnTail(A, B, DUEL.tailTouch * 1.3), tb = lineOnTail(B, A, DUEL.tailTouch * 1.3);
         const att = ta && !tb ? d.a : tb && !ta ? d.b : null;
         if (att) {

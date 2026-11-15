@@ -142,7 +142,7 @@ function updateDisputaHUD() {
     $('duel').classList.toggle('danger', dg > 0);
     if (dg > 0 && d.att === ss.myId) { $('duelTitle').textContent = 'Linhas encostadas! Segure ' + falta + ' s:'; $('duelKeys').innerHTML = 'Mantenha a <b>sua linha</b> encostada na dele até o fim para <b>aparar</b>'; }
     else if (dg > 0) { $('duelTitle').textContent = 'PERIGO! ' + falta + ' s para escapar de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> <b>afaste a sua linha da dele</b> (a contagem volta) e sacuda pra rabiola soltar'; }
-    else if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na dele e segure 6 s para <b>aparar</b>'; }
+    else if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na dele e segure ' + DUEL.dangerTime + ' s para <b>aparar</b>'; }
     else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola prendeu na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> afaste a pipa pra esticar · sacudir ajuda · <b>não deixe as linhas encostarem!</b>'; }
     else { $('duelTitle').textContent = 'ENROSCADA com'; $('duelKeys').innerHTML = '<kbd>W</kbd> puxa · <kbd>S</kbd> dá linha · <b>alterne os dois</b>: segurar um só perde força'; }
     $('duelName').textContent = name;
@@ -150,7 +150,7 @@ function updateDisputaHUD() {
     if (d.kind === 'rabiola') {
       // barra = quanto a rabiola já escorregou (verde = perto de soltar, do ponto de vista de quem foi preso)
       const f = d.f || 0, vic = d.att !== ss.myId;
-      if (dg > 0) { // em perigo a barra vira o relógio dos 6 s
+      if (dg > 0) { // em perigo a barra vira o relógio da contagem
         const k = dg / DUEL.dangerTime;
         $('duelBar').firstElementChild.style.width = ((vic ? 1 - k : k) * 100).toFixed(0) + '%';
         $('legL').textContent = vic ? 'tempo pra escapar' : 'aparando'; $('legR').textContent = falta + ' s';

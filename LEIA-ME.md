@@ -60,12 +60,12 @@ No **online**, vale o cenário de quem **criou** a sala: quem entra com código 
 - **Cabo de guerra:**
   - **W** puxa (gasta fôlego).
   - **S** dá linha (relo).
-  - **Alterne os dois:** segurar a mesma tecla rende 100% só no primeiro segundo e depois vai perdendo força.
+  - **Alterne os dois:** segurar a mesma tecla rende 100% por 1,5 segundo e depois vai perdendo força (até 35%).
   - A disputa é equilibrada: todos partem da mesma força, a enroscada puxa de volta pro meio (vantagem pequena não decide)
     e linha muito comprida responde mais devagar. Linha firme e pipa por cima ajudam só um pouquinho.
 - **Rabiola presa:** se a sua linha passar na rabiola do outro, a rabiola dele fica presa na sua linha,
   mas **ninguém perde só por isso**:
-  - Se a **linha** de quem prendeu **encostar na linha** do outro, começa uma **contagem de 6 segundos** (PERIGO).
+  - Se a **linha** de quem prendeu **encostar na linha** do outro, começa uma **contagem de 3 segundos** (PERIGO).
     Se as linhas ficarem encostadas até o fim, quem teve a rabiola presa perde: a pipa dele fica **pendurada pela rabiola**
     na linha de quem ganhou por 6 segundos, e aí vem o "Aparou!" (+100 da laçada +50 da aparada).
     Para escapar, **afaste a sua linha da dele** (a contagem volta) e estique/sacuda a rabiola até soltar; com as linhas
