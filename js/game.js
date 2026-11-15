@@ -568,7 +568,7 @@ function handleEvent(ss, e) {
     }
     case 'danger':
       if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#e63946', 'LINHAS ENCOSTARAM! ' + DUEL.dangerTime + ' s', true);
-      if (e.vic === me) { cam.shake = .4; flashDuel(); Snd.tangle(); toast('PERIGO! ' + DUEL.dangerTime + ' segundos pra escapar', 'Afaste a sua linha da dele (A/D) e sacuda a rabiola', 'bad', 3); }
+      if (e.vic === me) { cam.shake = .4; flashDuel(); Snd.tangle(); toast('PERIGO! ' + DUEL.dangerTime + ' s pra escapar', 'Afaste a sua linha da dele (A/D) e sacuda a rabiola', 'bad', 3); }
       else if (e.att === me) { flashDuel(); toast('Linhas encostadas!', 'Segure ' + DUEL.dangerTime + ' s encostado para aparar a pipa de ' + ss.nameOf(e.vic), 'good', 3); }
       break;
     case 'dangerOff':

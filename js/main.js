@@ -11,6 +11,7 @@ import { Snd } from './audio.js';
 import { updateFx } from './fx.js';
 import { initNPCs, updateNPCs } from './npcs.js';
 import { updateAparadas } from './aparada.js';
+import { loadDog, initDog, updateDog } from './dog.js';
 import { loadAnime } from './anime.js';
 import { createPost } from './post.js';
 import { isTouch, initTouch, updateTouch, goFullscreen } from './touch.js';
@@ -68,7 +69,7 @@ function switchScenario(id) {
       window.__buildMs = lastBuild; // só para conferência (testes)
       placePlayer();
       updateWind(); updatePlayer(0);
-      initNPCs();
+      initNPCs(); initDog();
       resetKite(); S.L = 30;
       const p = G.player.g.position;
       camera.position.set(p.x, p.y + 3, p.z + 8); cam.look.set(p.x, p.y + 6, p.z - 10);
@@ -125,6 +126,7 @@ function step(now) {
     updateLogic(dt);
     updateFx(dt);
     updateNPCs(dt, S.clock);
+    updateDog(dt, S.clock);
     updateAparadas(dt, S.clock, S.windDirH);
   }
   return dt;
@@ -166,12 +168,13 @@ function loadAmmo() {
   });
 }
 
-Promise.all([loadAmmo(), loadAnime()]).then(([{ lib }]) => { // o personagem anime carrega junto (se falhar, usa o boneco padrão)
+Promise.all([loadAmmo(), loadAnime(), loadDog()]).then(([{ lib }]) => { // o personagem anime carrega junto (se falhar, usa o boneco padrão)
   initPhysics(lib);
   S.scene = buildWorld(S.scene);
   initNPCs();
   setPlayerStyle(S.style);
   placePlayer();
+  initDog();
   updateWind();
   updatePlayer(0);
   if (!KITES[S.kiteType]) S.kiteType = 'pipa';

@@ -1,7 +1,8 @@
 // Leitor de .glb enxuto (glTF 2.0 binário) com suporte a esqueleto (SkinnedMesh), feito para os
 // personagens prontos da pasta modelos/. Sem dependências além do Three.js.
 // Lê: nós (TRS ou matriz), malhas com posição/normal/uv/juntas/pesos, skins, materiais com textura PNG/JPG
-// embutida, alphaMode (MASK/BLEND) e dupla face. Não lê: animações, morph targets, extensões.
+// embutida, alphaMode (MASK/BLEND), dupla face e animações (rotação/posição dos ossos, interpolação linear).
+// Não lê: morph targets, extensões.
 import * as THREE from 'three';
 
 const NUM = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
@@ -82,6 +83,15 @@ export async function loadGLB(url) {
     return list;
   });
 
+  // animações: guarda os canais; cada cópia do modelo monta os seus clipes (os ossos são outros)
+  const anims = (J.animations || []).map(a => ({
+    name: a.name || '',
+    tracks: a.channels.filter(c => c.target.path === 'rotation' || c.target.path === 'translation').map(c => {
+      const sm = a.samplers[c.sampler];
+      return { node: c.target.node, path: c.target.path, times: accessor(sm.input, true).array, values: accessor(sm.output, true).array };
+    }),
+  }));
+
   /**
    * makeMaterial(info, index) → THREE.Material (chamado uma vez por material e guardado).
    * Devolve { root, nodes[], byName(prefixo), meshes[] }.
@@ -125,7 +135,18 @@ export async function loadGLB(url) {
       });
     });
     const byName = prefix => nodes.find(n => n.name.startsWith(prefix)) || null;
-    return { root, nodes, meshes, byName, skeletons };
+    /** clipes de animação desta cópia: { nome: THREE.AnimationClip } (use com THREE.AnimationMixer(root)) */
+    const clips = () => {
+      const out = {};
+      for (const a of anims) {
+        const tracks = a.tracks.map(t => t.path === 'rotation'
+          ? new THREE.QuaternionKeyframeTrack(nodes[t.node].uuid + '.quaternion', t.times, t.values)
+          : new THREE.VectorKeyframeTrack(nodes[t.node].uuid + '.position', t.times, t.values));
+        out[a.name] = new THREE.AnimationClip(a.name, -1, tracks);
+      }
+      return out;
+    };
+    return { root, nodes, meshes, byName, skeletons, clips };
   }
 
   return { json: J, instantiate, materials: matInfo };

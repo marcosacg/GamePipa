@@ -26,6 +26,9 @@ Modelos 3D (.glb) e texturas do jogo: pasta **[Assets](Assets/LEIA-ME.md)**.
 - Personagem “Garoto ★”: modelo **“Black Boy Rigged Ready For Ue4”**, de **MotionStudioArts**
   ([Sketchfab](https://sketchfab.com/3d-models/black-boy-rigged-ready-for-ue4-c9ded09156c244a6b0c3a29820e7f42a)), licença
   [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Adaptado para o jogo (texturas reduzidas, materiais e animação por código).
+- Cachorro: modelo **“Animated Dog, Shiba Inu”**, de **quander**
+  ([Sketchfab](https://sketchfab.com/3d-models/animated-dog-shiba-inu-9abfce885a834399b2c3ccaed51cd474)), licença
+  [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Adaptado para o jogo (textura e animações reduzidas, andar feito por código).
 
 ## Bibliotecas incluídas em `vendor/`
 
