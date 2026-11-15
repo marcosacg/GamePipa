@@ -181,7 +181,7 @@ function cleanStyle(s) {
   return {
     skin: Math.round(num(s.skin, 3, 10)), hair: str(s.hair, 16, 'curto'), hat: str(s.hat, 16, 'nenhum'),
     shirt: Math.round(num(s.shirt, 0, 20)), shorts: Math.round(num(s.shorts, 0, 20)), spool: str(s.spool, 16, 'lata'),
-    model: ['anime', 'menino', 'zepeto'].includes(s.model) ? s.model : 'moleque',
+    model: ['anime', 'menino', 'zepeto', 'garoto'].includes(s.model) ? s.model : 'moleque',
   };
 }
 function cleanKite(k) {

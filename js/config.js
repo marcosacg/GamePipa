@@ -96,8 +96,9 @@ export const PRESETS = [
   { name: 'Anime ★',         style: { skin: 1, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'carretilha', model: 'anime' } },
   { name: 'Menino de boné ★', style: { skin: 1, hair: 'curto',     hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'lata', model: 'menino' } },
   { name: 'Zepeto ★',        style: { skin: 1, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'papelao', model: 'zepeto' } },
+  { name: 'Garoto ★',        style: { skin: 1, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'lata', model: 'garoto' } },
 ];
-export const MODELS = ['moleque', 'anime', 'menino', 'zepeto']; // moleque = boneco personalizável; os outros são modelos prontos (js/anime.js)
+export const MODELS = ['moleque', 'anime', 'menino', 'zepeto', 'garoto']; // moleque = boneco personalizável; os outros são modelos prontos (js/anime.js)
 
 export function normalizeStyle(s = {}) {
   const d = PRESETS[0].style;

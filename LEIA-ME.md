@@ -15,7 +15,7 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 
 ## Personagem Anime e visual de anime
 
-- No menu, aba **Personagem**, os estilos **Anime ★**, **Menino de boné ★** e **Zepeto ★** trocam o boneco por um personagem 3D pronto, com esqueleto.
+- No menu, aba **Personagem**, os estilos **Anime ★**, **Menino de boné ★**, **Zepeto ★** e **Garoto ★** trocam o boneco por um personagem 3D pronto, com esqueleto.
   Eles são animados por código (parado, andando, correndo, braço indo até a linha, puxando, bravo, cabelo balançando).
   O Menino de boné também muda de rosto: pisca e faz cara de bravo quando perde a pipa.
   Dá para trocar o carretel; cabelo e roupa são os do modelo. No online, os outros jogadores veem o personagem que você escolheu.
@@ -29,6 +29,8 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   - “Zepeto Boy Model”, de **ZEPETO EXPORTER** (https://sketchfab.com/3d-models/zepeto-boy-model-7a1bcd505ef041ba871867a5b612e16c).
     O original veio **sem esqueleto**: o arquivo do jogo (`modelos/zepeto-boy.glb`) ganhou 21 ossos criados por código, com a malha presa neles
     automaticamente (pela posição de cada ponto na pose de T). Ele não tem ossos de dedo, então a mão fica aberta.
+  - “Black Boy Rigged Ready For Ue4”, de **MotionStudioArts** (https://sketchfab.com/3d-models/black-boy-rigged-ready-for-ue4-c9ded09156c244a6b0c3a29820e7f42a).
+    O arquivo do jogo (`modelos/garoto-ue4.glb`) é uma versão enxuta do original (de 36 MB para 1,2 MB): texturas menores e sem os mapas de relevo.
 - Para adicionar outro personagem pronto: ponha o `.glb` em `modelos/` e acrescente uma entrada em `RIGS` no `js/anime.js`
   (nomes dos ossos, para onde ele olha e a altura), um estilo em `PRESETS` no `js/config.js` e o nome na lista do `server/server.js`.
 
@@ -147,10 +149,10 @@ js/shared/terrenos.js formato do terreno de cada cenário (jogo e servidor usam 
 img/cenarios/         miniaturas dos cenários no menu
 js/kite.js            formatos/estampas das pipas, rabiola e física da pipa do jogador
 js/player.js          personagem estilizado (cabelos, bonés, camisas) e poses
-js/anime.js           personagens prontos (Anime, Menino de boné e Zepeto): carrega os modelos, materiais, e anima os ossos por código
+js/anime.js           personagens prontos (Anime, Menino de boné, Zepeto e Garoto): carrega os modelos, materiais, e anima os ossos por código
 js/tools/glbload.js   leitor de .glb com esqueleto (para os modelos da pasta modelos/)
 js/post.js            acabamento da imagem: traço de contorno, brilho suave e cores (desligado no celular)
-modelos/              anime-boy.glb, menino-bone.glb e zepeto-boy.glb (modelos 3D dos personagens prontos)
+modelos/              anime-boy.glb, menino-bone.glb, zepeto-boy.glb e garoto-ue4.glb (modelos 3D dos personagens prontos)
 js/remote.js          outros jogadores e avoadas (visual)
 js/fx.js              efeitos: estouros, textos e rabiola enrolada na linha
 js/npcs.js            molecada figurante correndo com varas atrás das avoadas

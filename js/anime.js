@@ -2,6 +2,7 @@
 //   anime  → "Anime Boy for Blender", de Zaria (CC BY 4.0)
 //   menino → "Boy Idle Mixamo animation free", de unbeatable (CC BY 4.0)
 //   zepeto → "Zepeto Boy Model", de ZEPETO EXPORTER (CC BY 4.0)
+//   garoto → "Black Boy Rigged Ready For Ue4", de MotionStudioArts (CC BY 4.0)
 // Os arquivos vêm em pose de T. Aqui os ossos são movidos por código, igual para todos os modelos
 // (parado, andando/correndo, braço da linha indo até a mão, carretel na outra mão, bravo, cabelo balançando).
 import * as THREE from 'three';
@@ -41,6 +42,16 @@ export const RIGS = {
     bone: { hips: 'Z_Hips', spine: 'Z_Spine', chest: 'Z_Chest', upperChest: 'Z_UpperChest', neck: 'Z_Neck', head: 'Z_Head' },
     side: s => ({ shoulder: `Z_${s}_Shoulder`, upper: `Z_${s}_UpperArm`, lower: `Z_${s}_LowerArm`, hand: `Z_${s}_Hand`, thigh: `Z_${s}_UpperLeg`, shin: `Z_${s}_LowerLeg`, foot: `Z_${s}_Foot`,
       fingers: /^$/, thumb: /^$/ }),   // sem ossos de dedo: a mão fica aberta
+    hair: /^$/, hood: /^$/,
+  },
+  garoto: {
+    // esqueleto no padrão da Unreal (UE4): pelvis, spine_01..03, clavicle, upperarm, lowerarm, hand, thigh, calf, foot
+    url: 'modelos/garoto-ue4.glb', nome: 'Garoto',
+    credit: '“Black Boy Rigged Ready For Ue4”, de MotionStudioArts (Sketchfab) · CC BY 4.0',
+    turn: Math.PI, height: 1.45, top: 'head_end', outline: .003, softBody: true, skipOutline: null,
+    bone: { hips: 'pelvis_', spine: 'spine_01_', chest: 'spine_02_', upperChest: 'spine_03_', neck: 'neck_01_', head: 'head_' },
+    side: s => { const x = s.toLowerCase(); return { shoulder: `clavicle_${x}_`, upper: `upperarm_${x}_`, lower: `lowerarm_${x}_`, hand: `hand_${x}_`, thigh: `thigh_${x}_`, shin: `calf_${x}_`, foot: `foot_${x}_`,
+      fingers: new RegExp(`^(index|middle|ring|pinky)_0[123]_${x}_\\d`), thumb: new RegExp(`^thumb_0[123]_${x}_\\d`) }; },
     hair: /^$/, hood: /^$/,
   },
 };
