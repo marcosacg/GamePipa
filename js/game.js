@@ -625,6 +625,7 @@ export function startGame(mode, session = null) {
   clearRings(); clearStrays(); clearAparadas();
   if (G.session && G.session !== session) clearDisputa();
   S.mode = mode;
+  S.pauseOpen = false; S.paused = false;
   G.session = session;
   S.score = 0; S.scoreFrac = 0; S.mi = 0; S.mp = 0; S.missionDone = false; S.ended = false; S.stamina = 1;
   S.minutes = mode === 'desafios' ? 16 * 60 : mode === 'livre' ? 16.5 * 60 : 17.2 * 60;
@@ -674,7 +675,7 @@ function showMenu() {
 }
 
 export function toMenu() {
-  S.running = false; S.paused = false; S.ended = false;
+  S.running = false; S.paused = false; S.pauseOpen = false; S.ended = false; // pauseOpen: senão os botões de toque somem na próxima partida
   clearRings(); clearStrays(); clearDisputa(); clearAparadas();
   S.mode = 'livre'; S.windBase = 5.8; S.gustAmp = .35;
   $('pause').classList.add('hidden'); $('end').classList.add('hidden'); $('hud').classList.add('hidden'); showMenu();
