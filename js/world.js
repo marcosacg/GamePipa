@@ -46,6 +46,7 @@ export function setScenario(id) {
   PH.track = [];
   setSeed(7);           // mesma semente = mesmo cenário em todos os computadores (importante no online)
   const t0 = performance.now();
+  SCN.areas = null;     // só alguns cenários dividem os jogadores em áreas (as lajes)
   try { mod.build(root); }
   finally { cur = { mod, root, bodies: PH.track }; PH.track = null; }
   lastBuild.ms = Math.round(performance.now() - t0); lastBuild.bodies = cur.bodies.length;

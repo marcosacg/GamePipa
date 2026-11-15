@@ -27,8 +27,8 @@ const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / 
 const FLAT = { bases: [[-12, 18], [13, 20], [5, 28], [-6, 30]], ground: () => 0, walk: { x0: -29.5, x1: 25.8, z0: -52, z1: 48 } };
 
 class Bot {
-  constructor(id, meta, base, world = FLAT) {
-    this.id = id; this.meta = meta; this.base = base; this.world = world;
+  constructor(id, meta, base, world = FLAT, walk = world.walk) {
+    this.id = id; this.meta = meta; this.base = base; this.world = world; this.walk = walk;
     this.pos = [base[0], world.ground(base[0], base[1]), base[1]];
     this.az = rnd(-.5, .5); this.el = .8; this.L = rnd(25, 40);
     this.flying = true; this.respawn = 0;
@@ -43,7 +43,7 @@ class Bot {
   update(dt, t, W, arena, states) {
     const windAz = Math.atan2(W.dx, W.dz);
     // anda um pouquinho em volta do seu canto
-    const Wk = this.world.walk;
+    const Wk = this.walk;
     const wx = cl(this.base[0] + Math.sin(t * .05 + this.ph) * 3, Wk.x0, Wk.x1), wz = cl(this.base[1] + Math.cos(t * .04 + this.ph) * 2, Wk.z0, Wk.z1);
     const dx0 = wx - this.pos[0], dz0 = wz - this.pos[2];
     const dd = Math.hypot(dx0, dz0);
@@ -148,7 +148,7 @@ class Bot {
 }
 
 export class LocalSession {
-  /** world = { bases, ground(x,z), walk } do cenário atual */
+  /** world = { bases, ground(x,z), walk, walks? } do cenário atual (walks = área de cada base, quando cada bot tem a sua laje) */
   constructor(me, nBots = 3, world = FLAT) {
     this.myId = 'eu';
     this.label = 'Contra a molecada';
@@ -170,7 +170,7 @@ export class LocalSession {
         name: names[i], style: { ...PRESETS[Math.floor(Math.random() * PRESETS.length)].style },
         kite: { type, pat: Math.floor(Math.random() * getPatterns(type).length) },
       };
-      const b = new Bot('b' + i, meta, bases[i % bases.length], world);
+      const b = new Bot('b' + i, meta, bases[i % bases.length], world, world.walks ? world.walks[i % bases.length] : world.walk);
       this.bots.push(b);
       this.arena.addPlayer(b.id, meta);
       this.others.set(b.id, { meta, state: null });

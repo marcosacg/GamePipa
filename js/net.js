@@ -41,6 +41,7 @@ export class NetSession {
           welcomed = true;
           this.myId = m.id; this.room = m.room; this.label = 'Sala ' + m.room;
           this.scene = m.scene || 'campinho'; // servidor antigo não manda: campinho
+          this.slot = Number.isInteger(m.slot) ? m.slot : Math.floor(Math.random() * 8); // minha vaga (decide a laje)
           this.sync(m.rt); this.round = m.round; this.scores = m.scores || [];
           for (const p of m.players) this.others.set(p.id, { meta: p, state: null });
           if (m.v !== PROTOCOL) this.events.push({ type: 'oldServer' });

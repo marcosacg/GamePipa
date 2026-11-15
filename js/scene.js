@@ -157,6 +157,7 @@ export function updateSky(minutes, focus) {
    walk         retângulo onde o jogador anda
    spawns       pontos onde os jogadores aparecem [x,z]
    bots         cantinhos dos bots na disputa offline
+   areas        (opcional) áreas separadas, uma por jogador enquanto couber: [{ walk, spawns, bot }] (as lajes)
    npcZones     onde a molecada figurante fica e corre { x0,x1,z0,z1, homes:[[x,z]...] }
    fallLabel    texto quando a pipa cai: "no chão", "na laje do vizinho"... */
 export const FIELD = { hx: 20, hz: 30 };

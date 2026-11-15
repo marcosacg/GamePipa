@@ -31,7 +31,9 @@ buildMenu({
     goFullscreen();
     await Ads.commercialBreak('inicio'); // o Poki pede um intervalo antes de começar a jogar
     if (mode === 'disputa') startGame('disputa', new LocalSession({ name: S.name, style: S.style, kite: { type: S.kiteType, pat: S.patIdx } }, 3,
-      { bases: SCN.bots, ground: groundH, walk: SCN.walk }));
+      SCN.areas   // lajes: eu fico na primeira, cada bot numa das outras
+        ? { bases: SCN.areas.slice(1).map(a => a.bot), walks: SCN.areas.slice(1).map(a => a.walk), ground: groundH, walk: SCN.areas[0].walk }
+        : { bases: SCN.bots, ground: groundH, walk: SCN.walk }));
     else startGame(mode);
   },
   online(create, code, random = false) {

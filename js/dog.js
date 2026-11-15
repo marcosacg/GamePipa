@@ -101,8 +101,9 @@ export function updateDog(dt, t) {
   // ---------- o que ele quer fazer ----------
   d.timer -= dt;
   d.quiet = pv < .5 && dist < 6 ? d.quiet + dt : 0;
-  if (dist > 30) { // ficou pra trás (o jogador recomeçou em outro canto): aparece perto de novo
-    pos.set(P.x + 2 * d.side, 0, P.z + 2); d.vel.set(0, 0, 0); d.spot.copy(pos); d.mode = 'segue';
+  const Wk = SCN.walk, fora = Wk && Wk.x0 != null && (pos.x < Wk.x0 - 1 || pos.x > Wk.x1 + 1 || pos.z < Wk.z0 - 1 || pos.z > Wk.z1 + 1);
+  if (dist > 30 || fora) { // ficou pra trás ou em outra laje (o jogador recomeçou em outro canto): aparece perto de novo
+    pos.set(P.x + 1.5 * d.side, 0, P.z + 1.2); if (Wk && Wk.x0 != null) { pos.x = clamp(pos.x, Wk.x0 + .3, Wk.x1 - .3); pos.z = clamp(pos.z, Wk.z0 + .3, Wk.z1 - .3); } pos.y = groundH(pos.x, pos.z); d.vel.set(0, 0, 0); d.spot.copy(pos); d.mode = 'segue';
   }
   if (d.mode === 'sacode') { if (d.timer <= 0) { d.mode = 'segue'; d.timer = rand(3, 6); } }
   else if (d.mode === 'senta') {

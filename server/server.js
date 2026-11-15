@@ -211,10 +211,14 @@ function onConnection(conn) {
       if (r.players.size >= DUEL.maxPlayers) { conn.send({ t: 'error', msg: 'Sala cheia (máx. ' + DUEL.maxPlayers + ').' }); return; }
       room = r; id = 'p' + (nextId++);
       const meta = { name, style: cleanStyle(m.style), kite: cleanKite(m.kite) };
-      room.players.set(id, { conn, meta, state: null });
+      // vaga = menor número livre na sala. Nos cenários com lajes ela decide a laje: os primeiros ficam cada um na sua,
+      // e só quando acabam as lajes começam a dividir (laje = vaga % número de lajes).
+      const usadas = new Set([...room.players.values()].map(p => p.slot));
+      let slot = 0; while (usadas.has(slot)) slot++;
+      room.players.set(id, { conn, meta, state: null, slot });
       room.arena.addPlayer(id, meta);
       conn.send({
-        t: 'welcome', v: PROTOCOL, id, room: room.code, scene: room.scene, rt: room.time(), round: room.round,
+        t: 'welcome', v: PROTOCOL, id, slot, room: room.code, scene: room.scene, rt: room.time(), round: room.round,
         players: [...room.players].filter(([pid]) => pid !== id).map(([pid, p]) => publicPlayer(pid, p)),
         scores: room.arena.scores(),
       });

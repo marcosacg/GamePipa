@@ -35,6 +35,15 @@ export function build(group) {
     esq: { xa: -21, xb: -9.3, za: -5, zb: 7.5, top: LY + 1.5, kind: 'tijolo', roofCol: '#cfcac0' },
     dir: { xa: 9.3, xb: 19.5, za: -9.5, zb: 1.6, top: LY - 1.7, kind: 'pintada', color: '#9fc3e6', roofCol: '#c9c4ba' },
     tras: { xa: -7.5, xb: 7.5, za: 7.3, zb: 14, top: LY - 3, kind: 'tijolo', roofCol: '#bdb8ae' },
+    // mais duas lajes dos lados, para cada jogador (ou bot) da disputa ter a sua
+    esq2: { xa: -33.5, xb: -22.3, za: -4, zb: 7, top: LY + .5, kind: 'pintada', color: '#e9c46a', roofCol: '#cdc8be' },
+    dir2: { xa: 20.8, xb: 31.5, za: -8.5, zb: 2, top: LY - .7, kind: 'tijolo', roofCol: '#c4bfb5' },
+  };
+  const inset = (h, m = .8) => ({ x0: h.xa + m, x1: h.xb - m, z0: h.za + m, z1: h.zb - m });
+  /** uma laje vizinha como área de jogo: quem chega primeiro fica no meio, os próximos dos lados */
+  const area = h => {
+    const cx = (h.xa + h.xb) / 2, cz = (h.za + h.zb) / 2;
+    return { walk: inset(h), spawns: [[cx, cz + .5], [cx - 2.6, cz - 1.5], [cx + 2.6, cz - 1.5], [cx, cz + 3]], bot: [cx, cz] };
   };
   const manual = Object.values(lajes);
   const reserved = manual.map(h => ({ x0: h.xa, x1: h.xb, z0: h.za, z1: h.zb }));
@@ -45,9 +54,15 @@ export function build(group) {
     walk: { x0: -7.55, x1: 7.55, z0: -5.55, z1: 5.55 },
     spawns: [[0, 1], [-4, -2], [4, -2.5], [-3, 3], [3.5, 3], [-5.6, .5], [5.6, 0], [0, -3.5]],
     bots: [[-4.5, -1.5], [4.5, -2.5], [-2, 3.2], [3, 3.2]],
+    /* Cada jogador (online) ou bot fica numa laje só dele. Quando tem mais gente que laje, voltam a dividir:
+       o 6º entra na primeira laje, o 7º na segunda... (a vaga de cada um é um número; laje = vaga % 5). */
+    areas: [
+      { walk: { x0: -7.55, x1: 7.55, z0: -5.55, z1: 5.55 }, spawns: [[0, 1], [-4, -2], [4, -2.5], [0, -3.5]], bot: [-4.5, -1.5] },
+      area(lajes.esq), area(lajes.dir), area(lajes.esq2), area(lajes.dir2),
+    ],
+    // a molecada figurante fica na laje de trás (as dos lados agora são dos jogadores)
     npcZones: [
-      { x0: lajes.esq.xa + .8, x1: lajes.esq.xb - .8, z0: lajes.esq.za + .8, z1: lajes.esq.zb - .8, homes: [[-17, 0], [-13, 4]] },
-      { x0: lajes.dir.xa + .8, x1: lajes.dir.xb - .8, z0: lajes.dir.za + .8, z1: lajes.dir.zb - .8, homes: [[13, -6], [16, -2]] },
+      { ...inset(lajes.tras), homes: [[-4, 10.5], [0, 11.5], [4, 10]] },
     ],
     fallLabel: (x, z) => (fav.roofAt(x, z) !== null ? 'na laje do vizinho' : 'na rua'),
   });
@@ -151,6 +166,14 @@ function buildNeighbours(L) {
   // caixa d'água e antena nos vizinhos
   const tank = (x, y, z) => { const t = mesh(new THREE.CylinderGeometry(.6, .5, .9, 20), smat('#2f74b5', { roughness: .45 })); t.position.set(x, y + .45, z); root.add(t); };
   tank(e.xa + 1.2, e.top, e.zb - 1.4); tank(d.xb - 1.3, d.top, d.za + 1.2);
+  blockers.push({ x: e.xa + 1.2, z: e.zb - 1.4, r: .7 }, { x: d.xb - 1.3, z: d.za + 1.2, r: .7 });
+  // as duas lajes novas: mureta nos fundos e de um lado, caixa d'água no canto
+  for (const [h, side] of [[L.esq2, -1], [L.dir2, 1]]) {
+    const f = mesh(props.boxWorldUV(h.xb - h.xa, .7, .16, 2.4), m); f.position.set((h.xa + h.xb) / 2, h.top + .35, h.zb - .08); root.add(f);
+    const s = mesh(props.boxWorldUV(.16, .6, h.zb - h.za, 2.4), m); s.position.set(side < 0 ? h.xa + .08 : h.xb - .08, h.top + .3, (h.za + h.zb) / 2); root.add(s);
+    const tx = side < 0 ? h.xa + 1.2 : h.xb - 1.2;
+    tank(tx, h.top, h.zb - 1.3); blockers.push({ x: tx, z: h.zb - 1.3, r: .7 });
+  }
 }
 
 /* ---------------- topo do morro com árvores ---------------- */

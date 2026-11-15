@@ -44,7 +44,9 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 Escolha no menu, aba **Jogar** → **Cenário**. O mundo atrás do menu já muda na hora.
 
 - **Campinho**: o campo de várzea aberto, com árvores, traves, muro pichado e a bola.
-- **Laje**: em cima da laje, no meio da favela. O morro cheio de casas sobe bem na frente (é pra lá que o vento leva a pipa), com árvores no topo. Cuidado com a laje do vizinho, os fios e os "gatos" de luz. A molecada fica nas lajes do lado.
+- **Laje**: em cima da laje, no meio da favela. O morro cheio de casas sobe bem na frente (é pra lá que o vento leva a pipa), com árvores no topo. Cuidado com a laje do vizinho, os fios e os "gatos" de luz. A molecada figurante fica na laje de trás.
+  Na disputa (bots ou online) **cada jogador fica numa laje só dele** (são 5 lajes). Só quando a sala passa de 5 pessoas é que
+  elas começam a dividir: o 6º entra na primeira laje, o 7º na segunda, e assim por diante (até 8 por sala).
 - **Morro**: no terrão lá no alto. A favela de tijolo desce a ladeira e sobe o morro do outro lado, com o teleférico passando no meio.
 
 No **online**, vale o cenário de quem **criou** a sala: quem entra com código ou pela "Aleatória" vai direto para o cenário dela.

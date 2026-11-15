@@ -643,7 +643,7 @@ export function startGame(mode, session = null) {
   S.score = 0; S.scoreFrac = 0; S.mi = 0; S.mp = 0; S.missionDone = false; S.ended = false; S.stamina = 1;
   S.minutes = mode === 'desafios' ? 16 * 60 : mode === 'livre' ? 16.5 * 60 : 17.2 * 60;
   const P = G.player;
-  placePlayer(session && session.myId !== 'eu');
+  placePlayer(session && session.myId !== 'eu', session && session.slot != null ? session.slot : 0);
   P.vel.set(0, 0, 0);
   cam.yawOff = 0; cam.pitch = .14; cam.yawSm = Math.PI;
   if (session) { S.windBase = DISPUTA_WIND.base; S.gustAmp = DISPUTA_WIND.gust; }
@@ -663,10 +663,16 @@ export function startGame(mode, session = null) {
 }
 
 /** põe o jogador num ponto de saída do cenário (online: um ponto qualquer, para não nascer em cima de ninguém) */
-export function placePlayer(randomSpot = false) {
-  const P = G.player, sp = SCN.spawns;
-  const [x, z] = randomSpot ? sp[Math.floor(Math.random() * sp.length)] : sp[0];
-  const j = randomSpot ? .8 : 0;
+export function placePlayer(randomSpot = false, slot = 0) {
+  const P = G.player;
+  let sp = SCN.spawns, pick = randomSpot ? Math.floor(Math.random() * sp.length) : 0;
+  if (SCN.areas) {
+    // cenário com áreas separadas (lajes): a vaga diz em qual laje eu fico e em que canto dela
+    const n = SCN.areas.length, a = SCN.areas[slot % n];
+    SCN.walk = a.walk; sp = a.spawns; pick = Math.floor(slot / n) % sp.length;
+  }
+  const [x, z] = sp[pick];
+  const j = randomSpot && !SCN.areas ? .8 : 0;
   P.g.position.set(x + rand(-j, j), 0, z + rand(-j, j));
   P.g.position.x = clamp(P.g.position.x, SCN.walk.x0, SCN.walk.x1); P.g.position.z = clamp(P.g.position.z, SCN.walk.z0, SCN.walk.z1);
   P.g.position.y = groundH(P.g.position.x, P.g.position.z);
@@ -692,6 +698,7 @@ export function toMenu() {
   clearRings(); clearStrays(); clearDisputa(); clearAparadas();
   S.mode = 'livre'; S.windBase = 5.8; S.gustAmp = .35;
   $('pause').classList.add('hidden'); $('end').classList.add('hidden'); $('hud').classList.add('hidden'); showMenu();
+  if (SCN.areas) placePlayer(); // volta para a laje principal
   resetKite(); S.L = 30;
   Ads.gameplayStop();
   Ads.commercialBreak('menu');
