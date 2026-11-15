@@ -264,7 +264,8 @@ function lineOf(ss, who, me) {
   if (who === me) return myLine;
   return () => {
     const r = G.remotes.get(who), st = ss.others.get(who)?.state;
-    return r && r.line.visible && st && st.flying ? r.line : null;
+    // online o servidor manda só o estado ('voando'); os bots mandam também "flying"
+    return r && r.line.visible && !r.lostHold && st && (st.flying ?? st.st === 'voando') ? r.line : null;
   };
 }
 

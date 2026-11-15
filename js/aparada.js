@@ -11,6 +11,7 @@ import { makeKiteMesh, TailRenderer, proceduralTail } from './kite.js';
 const SEG = .38;         // distância entre os laços da rabiola (m)
 const DANGLE = 7;        // linha solta da avoada, pendurada no bico (m); os fios embolados caem do gancho
 const STRANDS = 3;
+const TOLERA = 2;        // quanto tempo a aparada espera a linha de quem aparou voltar antes de cair (s)
 const GRUDA = .8;        // tempo grudando/balançando antes de começar a escorregar (s)
 export const DURACAO = 6; // segundos pendurada na linha até o aviso de "Aparou!"
 const ND = 26, NC = 28;  // pontos da linha pendurada e da voltinha enrolada
@@ -73,18 +74,23 @@ class Hanging {
 
   update(dt, t, windDirH) {
     this.t += dt;
-    const line = this.dropped ? null : this.getLine();
-    if (!this.dropped && (!line || !line.visible)) this.drop();
+    let line = this.dropped ? null : this.getLine();
+    if (line && !line.visible) line = null;
+    // a linha pode "sumir" por um instante (travadinha na conexão de quem aparou): só cai se sumir de verdade
+    this.semLinha = line ? 0 : (this.semLinha || 0) + dt;
+    if (!this.dropped && !line && this.semLinha > TOLERA) this.drop();
     if (this.dropped) return this.fall(dt, t, windDirH);
 
     // escorrega pela linha até a mão (devagar no começo, depois mais rápido)
-    const L = lineLength(line) || 1;
-    if (this.t > GRUDA) {
-      this.v = Math.min(.8, this.v + .6 * dt); // escorrega bem devagar pela linha, balançando (dura os 6 s)
-      this.f -= this.v * dt / L;
-    }
-    this.f = Math.max(this.f, Math.min(.5, 2 / L)); // para a uns 2 m da mão: fica sempre os 6 s pendurada
-    lineAt(line, this.f, this.hook);
+    if (line) {
+      const L = lineLength(line) || 1;
+      if (this.t > GRUDA) {
+        this.v = Math.min(.8, this.v + .6 * dt); // escorrega bem devagar pela linha, balançando (dura os 6 s)
+        this.f -= this.v * dt / L;
+      }
+      this.f = Math.max(this.f, Math.min(.5, 2 / L)); // para a uns 2 m da mão: fica sempre os 6 s pendurada
+      lineAt(line, this.f, this.hook);
+    } // sem linha por um instante: fica balançando no último ponto
     if (this.t >= DURACAO) { this.arrive(); return false; }
 
     // pipa pendurada: ponto com massa preso no gancho por um pedaço de linha (balança sozinha)
@@ -103,8 +109,9 @@ class Hanging {
     this.vel.multiplyScalar(Math.exp(-.6 * dt));
 
     // direção da linha de quem aparou (para a voltinha e para saber o "outro lado")
-    lineAt(line, this.f + .02, _b); lineAt(line, this.f - .02, _t);
-    _t.subVectors(_b, _t).normalize();
+    this.tan = this.tan || new THREE.Vector3(0, 1, 0);
+    if (line) { lineAt(line, this.f + .02, _b); lineAt(line, this.f - .02, _t); this.tan.subVectors(_b, _t).normalize(); }
+    _t.copy(this.tan);
     _s.crossVectors(_t, _up).normalize();
     const kiteSide = Math.sign(_d.subVectors(this.pos, this.hook).dot(_s)) || this.side;
     this.other = (this.other || new THREE.Vector3()).copy(_s).multiplyScalar(-kiteSide); // lado oposto ao da pipa
@@ -227,3 +234,4 @@ export function updateAparadas(dt, t, windDirH) {
 }
 export function clearAparadas() { for (const h of list) if (!h.done) h.dispose(); list.length = 0; }
 export function aparadasCount() { return list.length; }
+export function aparadasInfo() { return list.map(h => ({ t: +h.t.toFixed(1), caindo: h.dropped })); }
