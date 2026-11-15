@@ -6,7 +6,7 @@ import { smooth, noise2, srand, clamp } from '../utils.js';
 import { PH, makeBody, staticBox } from '../physics.js';
 import { G_STATIC } from '../config.js';
 import { SCN, trees, blockers, lampMats } from '../scene.js';
-import { mesh, smat } from '../materials.js';
+import { mesh, smat, toonMat } from '../materials.js';
 import * as props from '../props.js';
 import { TERRAIN } from '../shared/terrenos.js';
 import { buildFavela, buildTerrain, wire, varal, FLOOR, COARSE, favelaTex } from './favela.js';
@@ -84,7 +84,7 @@ export function build(group) {
 
 /* ---------------- a nossa laje ---------------- */
 function buildOurLaje(h, LY) {
-  const murM = new THREE.MeshStandardMaterial({ map: props.textures.reboco(), color: '#e3dccd', roughness: .95 });
+  const murM = toonMat({ map: props.textures.reboco(), color: '#e3dccd', roughness: .95 });
   const capM = smat('#b9b3a6');
   const mur = (xa, xb, za, zb, hh) => {
     const m = mesh(props.boxWorldUV(xb - xa, hh, zb - za, 2.4), murM); m.position.set((xa + xb) / 2, LY + hh / 2, (za + zb) / 2); root.add(m);
@@ -98,7 +98,7 @@ function buildOurLaje(h, LY) {
 
   // quartinho da escada (com porta) no canto de trás
   const qx0 = h.xa + .2, qx1 = h.xa + 3, qz0 = h.zb - 2.8, qz1 = h.zb - .2, qh = 2.3;
-  const q = mesh(props.boxWorldUV(qx1 - qx0, qh, qz1 - qz0, 2.4), new THREE.MeshStandardMaterial({ map: props.textures.tijolo(), roughness: .95 }));
+  const q = mesh(props.boxWorldUV(qx1 - qx0, qh, qz1 - qz0, 2.4), toonMat({ map: props.textures.tijolo(), roughness: .95 }));
   q.position.set((qx0 + qx1) / 2, LY + qh / 2, (qz0 + qz1) / 2); root.add(q);
   const ql = mesh(new THREE.BoxGeometry(qx1 - qx0 + .3, .14, qz1 - qz0 + .3), smat('#a8a296')); ql.position.set((qx0 + qx1) / 2, LY + qh + .07, (qz0 + qz1) / 2); root.add(ql);
   const door = mesh(new THREE.BoxGeometry(.85, 1.95, .06), smat('#3d5a80', { roughness: .6 })); door.position.set(qx1 - .7, LY + .98, qz0 - .02); root.add(door);
@@ -135,7 +135,7 @@ function buildOurLaje(h, LY) {
   for (const [k, x, z] of [['lata', -1.2, 4.6], ['papelao', 1.8, 4.9]]) {
     const s = props.makeSpoolModel(k); s.position.set(x, LY + .08, z); s.rotation.set(Math.PI / 2, 0, srand() * 3); root.add(s);
   }
-  const tij = new THREE.MeshStandardMaterial({ map: props.textures.tijolo(), roughness: .95 });
+  const tij = toonMat({ map: props.textures.tijolo(), roughness: .95 });
   for (let i = 0; i < 9; i++) {
     const b = mesh(new THREE.BoxGeometry(.19, .09, .29), tij); b.position.set(h.xb - 2.6 + (i % 3) * .21, LY + .05 + Math.floor(i / 3) * .095, h.zb - 1 + (srand() - .5) * .05); root.add(b);
   }
@@ -144,7 +144,7 @@ function buildOurLaje(h, LY) {
 
 /* ---------------- lajes dos vizinhos ---------------- */
 function buildNeighbours(L) {
-  const m = new THREE.MeshStandardMaterial({ map: props.textures.reboco(), color: '#cfc8b8', roughness: .95 });
+  const m = toonMat({ map: props.textures.reboco(), color: '#cfc8b8', roughness: .95 });
   // mureta só de um lado (o resto é aberto, a molecada fica na beirada)
   const e = L.esq; const a = mesh(props.boxWorldUV(e.xb - e.xa, .7, .16, 2.4), m); a.position.set((e.xa + e.xb) / 2, e.top + .35, e.zb - .08); root.add(a);
   const d = L.dir; const b = mesh(props.boxWorldUV(.16, .55, d.zb - d.za, 2.4), m); b.position.set(d.xb - .08, d.top + .28, (d.za + d.zb) / 2); root.add(b);

@@ -2,6 +2,7 @@
 // janelas (que acendem à noite), lajes, caixas d'água, puxadinhos, fios e varais.
 // Para não pesar, as casas viram poucas malhas grandes (uma por material) e as caixas d'água são instanciadas.
 import * as THREE from 'three';
+import { toonMat, noOutline } from '../materials.js';
 import { staticBox } from '../physics.js';
 import { lampMats } from '../scene.js';
 import { srand, lerp, setSeed } from '../utils.js';
@@ -268,10 +269,10 @@ export function buildFavela(root, opts) {
   }
 
   const facM = (map) => {
-    const m = new THREE.MeshStandardMaterial({ map, vertexColors: true, roughness: .93, emissive: '#ffffff', emissiveMap: favelaTex.luz(), emissiveIntensity: 0 });
+    const m = toonMat({ map, vertexColors: true, roughness: .93, emissive: '#ffffff', emissiveMap: favelaTex.luz(), emissiveIntensity: 0 });
     lampMats.push(m); return m;
   };
-  const roofM = new THREE.MeshStandardMaterial({ map: favelaTex.laje(), vertexColors: true, roughness: .97 });
+  const roofM = toonMat({ map: favelaTex.laje(), vertexColors: true, roughness: .97 });
   const add = (b, m) => { if (b.empty) return null; const o = new THREE.Mesh(b.geometry(), m); o.castShadow = true; o.receiveShadow = true; root.add(o); return o; };
   add(bT, facM(favelaTex.tijolo()));
   add(bP, facM(favelaTex.pintada()));
@@ -281,7 +282,7 @@ export function buildFavela(root, opts) {
   if (tanks.length) {
     const g = new THREE.CylinderGeometry(.6, .5, .9, 14); g.translate(0, .45, 0);
     const lid = new THREE.CylinderGeometry(.64, .64, .08, 14); lid.translate(0, .94, 0);
-    const im = new THREE.InstancedMesh(mergeGeos([g, lid]), new THREE.MeshStandardMaterial({ color: '#2f74b5', roughness: .45 }), tanks.length);
+    const im = new THREE.InstancedMesh(mergeGeos([g, lid]), toonMat({ color: '#2f74b5', roughness: .45 }), tanks.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
     tanks.forEach((t, i) => { p.set(t[0], t[1], t[2]); s.setScalar(t[3]); m4.compose(p, q, s); im.setMatrixAt(i, m4); });
     im.castShadow = true; im.receiveShadow = true;
@@ -330,7 +331,7 @@ export function makeFavelaBlock(seed = 3, brick = .5) {
   setSeed(seed);
   const terrain = (x, z) => -z * .32 + Math.sin(x * .2) * .6;
   buildFavela(g, { terrain, area: { x0: -15, x1: 15, z0: -15, z1: 15 }, physics: false, brick, skip: () => false });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32, 16, 16).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: favelaTex.terra(), color: '#9b8670', roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32, 16, 16).rotateX(-Math.PI / 2), toonMat({ map: favelaTex.terra(), color: '#9b8670', roughness: 1 }));
   const p = ground.geometry.attributes.position;
   for (let i = 0; i < p.count; i++) p.setY(i, terrain(p.getX(i), p.getZ(i)) - .05);
   ground.geometry.computeVertexNormals(); ground.receiveShadow = true;
@@ -398,7 +399,7 @@ export function buildTerrain(root, terrain, colorAt, size = 900, seg = 180, texR
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   g.computeVertexNormals();
   const tex = favelaTex.terra().clone(); tex.needsUpdate = true; tex.repeat.set(texRepeat, texRepeat);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, roughness: 1 }));
+  const m = new THREE.Mesh(g, toonMat({ vertexColors: true, map: tex, roughness: 1 }));
   m.receiveShadow = true;
   root.add(m);
   return m;
@@ -407,7 +408,7 @@ export function buildTerrain(root, terrain, colorAt, size = 900, seg = 180, texR
 /* =========================================================
    Fios entre postes / casas (a pipa enrosca)
    ========================================================= */
-const wireMat = new THREE.LineBasicMaterial({ color: 0x1b1b1b });
+const wireMat = noOutline(new THREE.LineBasicMaterial({ color: 0x1b1b1b }));
 export function wire(root, a, b, sag = .8, collide = true, label = 'no fio') {
   const pts = [];
   for (let k = 0; k <= 16; k++) { const t = k / 16; const p = new THREE.Vector3().lerpVectors(a, b, t); p.y -= Math.sin(t * Math.PI) * sag; pts.push(p); }
@@ -428,7 +429,7 @@ export function varal(root, a, b, swing) {
     const kind = srand();
     const w = kind < .5 ? .5 : kind < .8 ? .35 : .7, h = kind < .5 ? .55 : kind < .8 ? .45 : .35;
     const geo = new THREE.PlaneGeometry(w, h); geo.translate(0, -h / 2, 0);
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: cols[Math.floor(srand() * cols.length)], side: THREE.DoubleSide, roughness: .9 }));
+    const m = new THREE.Mesh(geo, toonMat({ color: cols[Math.floor(srand() * cols.length)], side: THREE.DoubleSide, roughness: .9 }));
     m.position.copy(pts[k]); m.rotation.order = 'YXZ'; m.rotation.y = Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2;
     m.castShadow = true; m.userData.ph = srand() * 6;
     root.add(m); swing.push(m);

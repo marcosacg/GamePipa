@@ -3,6 +3,7 @@
 // da linha, e a linha dela fica solta, pendurada no bico. Escorrega devagar por 6 segundos e aí vem o "Aparou!".
 // É só visual: os pontos continuam sendo decididos pelo jogo (livre) ou pela arena (disputa/online).
 import * as THREE from 'three';
+import { noOutline } from './materials.js';
 import { KITES } from './config.js';
 import { scene } from './scene.js';
 import { makeKiteMesh, TailRenderer, proceduralTail } from './kite.js';
@@ -41,7 +42,7 @@ function lineLength(line) {
 }
 function makeLineObj(n, color) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color })); l.frustumCulled = false;
+  const l = new THREE.Line(g, noOutline(new THREE.LineBasicMaterial({ color }))); l.frustumCulled = false;
   return l;
 }
 

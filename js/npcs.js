@@ -29,7 +29,7 @@ export function clearNPCs() {
 /** cria a molecada nas zonas do cenário atual (campo inteiro, lajes dos vizinhos...) */
 export function initNPCs() {
   clearNPCs();
-  const presets = [...PRESETS].sort(() => Math.random() - .5);
+  const presets = PRESETS.filter(p => p.style.model === 'moleque').sort(() => Math.random() - .5); // figurante é sempre o boneco simples
   const homes = [];
   for (const zone of SCN.npcZones) for (const h of zone.homes) homes.push([h[0], h[1], zone]);
   homes.forEach(([x, z, zone], i) => {

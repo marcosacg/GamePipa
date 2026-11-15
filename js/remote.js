@@ -1,5 +1,6 @@
 // Outros jogadores (online ou bots) e pipas avoadas da disputa — só visual, sem física
 import * as THREE from 'three';
+import { noOutline } from './materials.js';
 import { KITES } from './config.js';
 import { scene, makeLabel, groundH } from './scene.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry } from './player.js';
@@ -12,7 +13,7 @@ const V = a => new THREE.Vector3(a[0], a[1], a[2]);
 function makeLine(color = 0xf7f3e8) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array((LN + 1) * 3), 3));
-  const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color }));
+  const l = new THREE.Line(g, noOutline(new THREE.LineBasicMaterial({ color })));
   l.frustumCulled = false;
   scene.add(l);
   return l;

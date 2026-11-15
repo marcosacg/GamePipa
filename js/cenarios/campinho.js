@@ -6,7 +6,7 @@ import { PH, makeBody, staticBox, UP } from '../physics.js';
 import { G } from '../state.js';
 import { G_GROUND, G_STATIC, G_BALL } from '../config.js';
 import { SCN, FIELD, trees, groundH, lampMats } from '../scene.js';
-import { mesh, smat } from '../materials.js';
+import { mesh, smat, toonMat, noOutline } from '../materials.js';
 import * as props from '../props.js';
 import { TERRAIN } from '../shared/terrenos.js';
 
@@ -39,7 +39,7 @@ function buildGround() {
   g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   g.computeVertexNormals();
   const tex = props.textures.grama().clone(); tex.needsUpdate = true; tex.repeat.set(260, 260);
-  root.add(mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, roughness: 1 }), false, true));
+  root.add(mesh(g, toonMat({ vertexColors: true, map: tex, roughness: 1 }), false, true));
   const gb = makeBody(new A.btBoxShape(new A.btVector3(450, 1, 450)), 0, new THREE.Vector3(0, -1, 0), null, G_GROUND, -1, { type: 'ground' });
   gb.setFriction(.8);
 
@@ -90,7 +90,7 @@ function buildTrees() {
 function buildPoles() {
   const zs = []; for (let z = -70; z <= 70; z += 20) zs.push(z);
   const X = 27, wireY = 8.75;
-  const wireMat = new THREE.LineBasicMaterial({ color: 0x1a1a1a });
+  const wireMat = noOutline(new THREE.LineBasicMaterial({ color: 0x1a1a1a }));
   for (const z of zs) {
     const g = props.makePole(); g.position.set(X, 0, z); root.add(g);
     lampMats.push(g.userData.lampMat);
@@ -126,14 +126,14 @@ function buildHouses() {
   for (let z = -48; z < 48;) { const w = 6 + srand() * 3; house(-54 - srand() * 2, z + w / 2, w, 8, Math.PI / 2); z += w + .4 + srand() * 1.2; }
 
   // muro pichado
-  const wallM = new THREE.MeshStandardMaterial({ map: props.textures.reboco(), color: '#d8d2c4', roughness: .95 });
+  const wallM = toonMat({ map: props.textures.reboco(), color: '#d8d2c4', roughness: .95 });
   const wall = mesh(props.boxWorldUV(.25, 1.8, 46, 2.4), wallM); wall.position.set(-30, .9, 0); root.add(wall);
   const cap = mesh(new THREE.BoxGeometry(.35, .08, 46.1), smat('#bdb6a6')); cap.position.set(-30, 1.84, 0); root.add(cap);
   staticBox(.15, .9, 23, new THREE.Vector3(-30, .9, 0), { type: 'house', label: 'no muro' });
   const tagCols = ['#e63946', '#118ab2', '#ffd166', '#06d6a0', '#8338ec', '#1b1b1f'];
   for (let i = 0; i < 22; i++) {
     const w = .6 + srand() * 2.2, hh = .3 + srand() * .9;
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, hh), new THREE.MeshStandardMaterial({ color: tagCols[i % tagCols.length], transparent: true, opacity: .8, roughness: .9 }));
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, hh), toonMat({ color: tagCols[i % tagCols.length], transparent: true, opacity: .8, roughness: .9 }));
     p.rotation.y = Math.PI / 2; p.position.set(-29.86, .3 + hh / 2 + srand() * (1.4 - hh), -21 + srand() * 42);
     root.add(p);
   }
@@ -147,7 +147,7 @@ function buildBandeirinhas() {
   function stringFlags(a, b, sag) {
     const pts = [];
     for (let k = 0; k <= 30; k++) { const t = k / 30; const p = new THREE.Vector3().lerpVectors(a, b, t); p.y -= Math.sin(t * Math.PI) * sag; pts.push(p); }
-    root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x333333 })));
+    root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), noOutline(new THREE.LineBasicMaterial({ color: 0x333333 }))));
     const yaw = Math.atan2(-(b.z - a.z), b.x - a.x);
     for (let k = 1; k < 30; k++) {
       const f = new THREE.Mesh(tri, smat(cols[k % cols.length], { side: THREE.DoubleSide, roughness: .8 }));

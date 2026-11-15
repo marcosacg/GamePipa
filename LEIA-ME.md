@@ -13,6 +13,25 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 3. Na **primeira vez** precisa de internet: o servidor baixa Three.js, Ammo.js e as fontes para a pasta `vendor/`.
    Depois disso o jogo roda **sem internet**. (Para baixar tudo de uma vez: `npm run vendor`.)
 
+## Personagem Anime e visual de anime
+
+- No menu, aba **Personagem**, os estilos **Anime ★**, **Menino de boné ★** e **Zepeto ★** trocam o boneco por um personagem 3D pronto, com esqueleto.
+  Eles são animados por código (parado, andando, correndo, braço indo até a linha, puxando, bravo, cabelo balançando).
+  O Menino de boné também muda de rosto: pisca e faz cara de bravo quando perde a pipa.
+  Dá para trocar o carretel; cabelo e roupa são os do modelo. No online, os outros jogadores veem o personagem que você escolheu.
+- O jogo inteiro usa o mesmo visual: sombreamento em faixas (cel shading), traço escuro no contorno dos objetos próximos,
+  céu com nuvens pintadas que mudam com a hora, cores mais vivas e brilho suave. No celular o traço e o brilho ficam
+  desligados para rodar liso.
+- **Crédito obrigatório dos modelos** (licença CC BY 4.0). Se publicar o jogo, mantenha (eles já aparecem no menu, na aba Personagem):
+  - “Anime Boy for Blender”, de **Zaria** (https://sketchfab.com/3d-models/anime-boy-for-blender-3f8f011947cb4e1a9e0e97f8c38a4cc3)
+  - “Boy Idle Mixamo animation free”, de **unbeatable** (https://sketchfab.com/3d-models/boy-idle-mixamo-animation-free-10bb5911f36f41ae872fb567d34d269c).
+    O arquivo do jogo (`modelos/menino-bone.glb`) é uma versão enxuta do original: texturas menores, sem o mapa de relevo e sem a animação embutida.
+  - “Zepeto Boy Model”, de **ZEPETO EXPORTER** (https://sketchfab.com/3d-models/zepeto-boy-model-7a1bcd505ef041ba871867a5b612e16c).
+    O original veio **sem esqueleto**: o arquivo do jogo (`modelos/zepeto-boy.glb`) ganhou 21 ossos criados por código, com a malha presa neles
+    automaticamente (pela posição de cada ponto na pose de T). Ele não tem ossos de dedo, então a mão fica aberta.
+- Para adicionar outro personagem pronto: ponha o `.glb` em `modelos/` e acrescente uma entrada em `RIGS` no `js/anime.js`
+  (nomes dos ossos, para onde ele olha e a altura), um estilo em `PRESETS` no `js/config.js` e o nome na lista do `server/server.js`.
+
 ## Cenários
 
 Escolha no menu, aba **Jogar** → **Cenário**. O mundo atrás do menu já muda na hora.
@@ -128,6 +147,10 @@ js/shared/terrenos.js formato do terreno de cada cenário (jogo e servidor usam 
 img/cenarios/         miniaturas dos cenários no menu
 js/kite.js            formatos/estampas das pipas, rabiola e física da pipa do jogador
 js/player.js          personagem estilizado (cabelos, bonés, camisas) e poses
+js/anime.js           personagens prontos (Anime, Menino de boné e Zepeto): carrega os modelos, materiais, e anima os ossos por código
+js/tools/glbload.js   leitor de .glb com esqueleto (para os modelos da pasta modelos/)
+js/post.js            acabamento da imagem: traço de contorno, brilho suave e cores (desligado no celular)
+modelos/              anime-boy.glb, menino-bone.glb e zepeto-boy.glb (modelos 3D dos personagens prontos)
 js/remote.js          outros jogadores e avoadas (visual)
 js/fx.js              efeitos: estouros, textos e rabiola enrolada na linha
 js/npcs.js            molecada figurante correndo com varas atrás das avoadas

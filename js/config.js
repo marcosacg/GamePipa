@@ -86,13 +86,18 @@ export const SHORTS = ['#1d4fa3', '#1b1b1f', '#2a9d8f', '#9b2226', '#6c757d'];
 export const SPOOLS = [{ id: 'lata', name: 'Lata' }, { id: 'papelao', name: 'Papelão' }, { id: 'carretilha', name: 'Carretilha' }];
 
 export const PRESETS = [
-  { name: 'Moleque da laje', style: { skin: 3, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'lata' } },
-  { name: 'Boné pra trás',   style: { skin: 2, hair: 'curto',      hat: 'bonetras', shirt: 3, shorts: 1, spool: 'carretilha' } },
-  { name: 'Black power',     style: { skin: 4, hair: 'blackpower', hat: 'nenhum',   shirt: 1, shorts: 1, spool: 'papelao' } },
-  { name: 'Chapéu de palha', style: { skin: 1, hair: 'curto',      hat: 'palha',    shirt: 2, shorts: 3, spool: 'lata' } },
-  { name: 'Trancinhas',      style: { skin: 3, hair: 'trancas',    hat: 'nenhum',   shirt: 4, shorts: 2, spool: 'carretilha' } },
-  { name: 'Sem camisa',      style: { skin: 2, hair: 'raspado',    hat: 'bone',     shirt: 5, shorts: 0, spool: 'papelao' } },
+  { name: 'Moleque da laje', style: { skin: 3, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'lata', model: 'moleque' } },
+  { name: 'Boné pra trás',   style: { skin: 2, hair: 'curto',      hat: 'bonetras', shirt: 3, shorts: 1, spool: 'carretilha', model: 'moleque' } },
+  { name: 'Black power',     style: { skin: 4, hair: 'blackpower', hat: 'nenhum',   shirt: 1, shorts: 1, spool: 'papelao', model: 'moleque' } },
+  { name: 'Chapéu de palha', style: { skin: 1, hair: 'curto',      hat: 'palha',    shirt: 2, shorts: 3, spool: 'lata', model: 'moleque' } },
+  { name: 'Trancinhas',      style: { skin: 3, hair: 'trancas',    hat: 'nenhum',   shirt: 4, shorts: 2, spool: 'carretilha', model: 'moleque' } },
+  { name: 'Sem camisa',      style: { skin: 2, hair: 'raspado',    hat: 'bone',     shirt: 5, shorts: 0, spool: 'papelao', model: 'moleque' } },
+  // personagem pronto (modelo 3D com esqueleto): pele/cabelo/roupa são os do próprio modelo
+  { name: 'Anime ★',         style: { skin: 1, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'carretilha', model: 'anime' } },
+  { name: 'Menino de boné ★', style: { skin: 1, hair: 'curto',     hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'lata', model: 'menino' } },
+  { name: 'Zepeto ★',        style: { skin: 1, hair: 'curto',      hat: 'nenhum',   shirt: 0, shorts: 0, spool: 'papelao', model: 'zepeto' } },
 ];
+export const MODELS = ['moleque', 'anime', 'menino', 'zepeto']; // moleque = boneco personalizável; os outros são modelos prontos (js/anime.js)
 
 export function normalizeStyle(s = {}) {
   const d = PRESETS[0].style;
@@ -101,6 +106,7 @@ export function normalizeStyle(s = {}) {
   return {
     skin: idx(s.skin, SKINS.length, d.skin), hair: ok(HAIRS, s.hair, d.hair), hat: ok(HATS, s.hat, d.hat),
     shirt: idx(s.shirt, SHIRTS.length, d.shirt), shorts: idx(s.shorts, SHORTS.length, d.shorts), spool: ok(SPOOLS, s.spool, d.spool),
+    model: MODELS.includes(s.model) ? s.model : 'moleque',
   };
 }
 

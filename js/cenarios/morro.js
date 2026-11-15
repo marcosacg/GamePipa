@@ -5,7 +5,7 @@ import { smooth, noise2, srand, lerp } from '../utils.js';
 import { PH, makeBody, staticBox, UP } from '../physics.js';
 import { G_STATIC } from '../config.js';
 import { SCN, trees, blockers } from '../scene.js';
-import { mesh, smat } from '../materials.js';
+import { mesh, smat, toonMat } from '../materials.js';
 import * as props from '../props.js';
 import { TERRAIN } from '../shared/terrenos.js';
 import { buildFavela, buildTerrain, wire, FLOOR, COARSE } from './favela.js';
@@ -70,7 +70,7 @@ function buildClearing() {
   for (let i = 0; i < posts.length - 1; i++) {
     const [ax, az] = posts[i], [bx, bz] = posts[i + 1];
     const len = Math.hypot(bx - ax, bz - az), map = tex.clone(); map.needsUpdate = true; map.repeat.set(len / 1.2, 1);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.2), new THREE.MeshStandardMaterial({ map, transparent: true, alphaTest: .3, side: THREE.DoubleSide, roughness: .9 }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.2), toonMat({ map, transparent: true, alphaTest: .3, side: THREE.DoubleSide, roughness: .9 }));
     m.position.set((ax + bx) / 2, terrain((ax + bx) / 2, (az + bz) / 2) + .6, (az + bz) / 2);
     m.rotation.y = Math.atan2(-(bz - az), bx - ax);
     root.add(m);
@@ -78,7 +78,7 @@ function buildClearing() {
   for (const [x, z] of posts) { const p = mesh(new THREE.CylinderGeometry(.04, .04, 1.4, 6), smat('#8a6a46')); p.position.set(x, terrain(x, z) + .7, z); root.add(p); }
 
   // tijolos empilhados, um pneu velho, pedras
-  const tij = new THREE.MeshStandardMaterial({ map: props.textures.tijolo(), roughness: .95 });
+  const tij = toonMat({ map: props.textures.tijolo(), roughness: .95 });
   for (let i = 0; i < 14; i++) { const b = mesh(new THREE.BoxGeometry(.19, .09, .29), tij); b.position.set(10 + (i % 4) * .21, .05 + Math.floor(i / 4) * .095, 15 + srand() * .05); b.rotation.y = (srand() - .5) * .15; root.add(b); }
   blockers.push({ x0: 9.8, x1: 10.8, z0: 14.7, z1: 15.3 });
   const tire = mesh(new THREE.TorusGeometry(.32, .12, 10, 20), smat('#1d1d1d', { roughness: .8 })); tire.rotation.x = Math.PI / 2; tire.position.set(-11, .12, 13); root.add(tire);

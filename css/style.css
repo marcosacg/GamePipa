@@ -312,3 +312,8 @@ body.touch .keys { display: none; }
 @keyframes perigo { 50% { opacity: .35; } }
 #tensionBar.perigo { box-shadow: 0 0 0 2px rgba(230,57,70,.6); }
 #tensionBar.perigo i { animation: perigo .3s linear infinite; }
+
+/* personagem pronto (anime): some o que não dá para personalizar */
+.so-pronto { display: none; }
+.modelo-pronto .so-moleque { display: none; }
+.modelo-pronto .so-pronto { display: block; }

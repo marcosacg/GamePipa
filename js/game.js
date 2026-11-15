@@ -1,5 +1,6 @@
 // Regras do jogo: jogador, câmera, missões, argolas, avoadas e disputa
 import * as THREE from 'three';
+import { toonMat } from './materials.js';
 import { S, G, keys } from './state.js';
 import { MISSIONS, KITES, getPatterns, MAX_LINE, MIN_LINE, G_STRAY, G_GROUND, G_STATIC, H, DISPUTA_WIND } from './config.js';
 import { clamp, lerp, rand, lerpAngle, segDist } from './utils.js';
@@ -7,7 +8,7 @@ import { windState } from './shared/wind.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, UP } from './physics.js';
 import { scene, camera, renderer, groundH, trees, SCN, collideWalk } from './scene.js';
 import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail } from './kite.js';
-import { makeCharacter, disposeCharacter, poseCharacter, poseAngry } from './player.js';
+import { makeCharacter, disposeCharacter, poseCharacter, poseAngry, lineHand } from './player.js';
 import { RemoteView, StrayView } from './remote.js';
 import { Snd } from './audio.js';
 import { toast, $ } from './hud.js';
@@ -104,7 +105,8 @@ export function updatePlayer(dt) {
   poseCharacter(P, dt, P.vel.length(), S.hand);
   const angry = S.running && isFail(S.state);
   poseAngry(P, dt, S.clock, angry);
-  if (P.angry > .02) { P.g.updateMatrixWorld(true); P.armR.localToWorld(S.hand.set(0, 0, .58)); }
+  if (lineHand(P, S.hand)) { /* personagem com esqueleto: a linha sai da mão de verdade */ }
+  else if (P.angry > .02) { P.g.updateMatrixWorld(true); P.armR.localToWorld(S.hand.set(0, 0, .58)); }
   P.spool.getWorldPosition(S.spoolPos);
 
   // chutar a bola
@@ -236,7 +238,7 @@ G.hooks.onFail = (kind, msg, sub) => {
    Argolas e avoadas (modos livre e desafios)
    ========================================================= */
 const ringGeo = new THREE.TorusGeometry(2.6, .2, 6, 18);
-const ringMat = new THREE.MeshStandardMaterial({ color: '#ffd166', emissive: '#ffb703', emissiveIntensity: .7, flatShading: true });
+const ringMat = toonMat({ color: '#ffd166', emissive: '#ffb703', emissiveIntensity: .7, flatShading: true });
 const discMat = new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: .14, side: THREE.DoubleSide, depthWrite: false });
 
 function spawnRing(minH = 0) {

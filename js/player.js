@@ -3,7 +3,8 @@
 // Os braços apontam para +Z a partir do ombro (a mão fica a ~0,55 do ombro).
 import * as THREE from 'three';
 import { SKINS, SHIRTS, SHORTS, normalizeStyle } from './config.js';
-import { mesh, smat } from './materials.js';
+import { mesh, smat, toonMat } from './materials.js';
+import { animeReady, makeAnimeCharacter, poseAnime, animeHandWorld, disposeAnime } from './anime.js';
 
 const HAIR = '#2a1d16';
 const sphere = (r, w = 20, h = 14) => new THREE.SphereGeometry(r, w, h);
@@ -80,13 +81,21 @@ export function makeSpool(type) {
 
 export function makeCharacter(styleIn) {
   const st = normalizeStyle(styleIn);
+  if (st.model !== 'moleque' && animeReady(st.model)) {
+    // personagem pronto (anime.js): mesmos "pontos" que o jogo usa, mas com esqueleto de verdade
+    const c = makeAnimeCharacter(st, makeSpool, blobShadow, makeAngerTag());
+    if (c) {
+      c.g.position.set(0, 0, 22);
+      return Object.assign(c, { style: st, yaw: Math.PI, vel: new THREE.Vector3(), kickCd: 0, speed: 0, handTarget: null });
+    }
+  }
   const g = new THREE.Group();
   const skinHex = SKINS[st.skin];
   const skin = smat(skinHex, { roughness: .62 });
   const skinDark = smat(new THREE.Color(skinHex).multiplyScalar(.82).getHexString().replace(/^/, '#'), { roughness: .62 });
   const sh = SHIRTS[st.shirt];
   const bare = sh.mode === 'sem';
-  const shirtM = bare ? skin : new THREE.MeshStandardMaterial({ map: shirtTexture(st.shirt), roughness: .85 });
+  const shirtM = bare ? skin : toonMat({ map: shirtTexture(st.shirt), roughness: .85 });
   const sleeveM = bare ? skin : smat(sh.a, { roughness: .85 });
   const shortsM = smat(SHORTS[st.shorts], { roughness: .85 });
   const hairM = smat(HAIR, { roughness: .95 });
@@ -218,6 +227,7 @@ export function angerTexture() { if (!angerTex) makeAngerTag(); return angerTex;
  * on = true enquanto estiver bravo. Chame depois de poseCharacter().
  */
 export function poseAngry(c, dt, t, on) {
+  if (c.kind === 'anime') { poseAnime(c, dt, c.speed, c.handTarget, on, t); return; } // anima tudo de uma vez
   c.angry += ((on ? 1 : 0) - c.angry) * Math.min(1, dt * 8);
   const k = c.angry;
   const show = k > .02;
@@ -239,16 +249,25 @@ export function poseAngry(c, dt, t, on) {
 const lerp = (a, b, t) => a + (b - a) * t;
 
 export function disposeCharacter(c) {
+  if (c.kind === 'anime') { disposeAnime(c); return; }
   if (c.g.parent) c.g.parent.remove(c.g);
   c.g.traverse(o => { if (o.geometry) o.geometry.dispose(); });
 }
 
 /** anima pernas (e um balanço leve do corpo) e aponta o braço da linha para a mão */
 export function poseCharacter(c, dt, speed, hand) {
+  if (c.kind === 'anime') { c.speed = speed; c.handTarget = hand; return; } // quem anima é o poseAngry (chamado logo depois)
   c.phase += dt * speed * 3.2;
   const amt = Math.min(1, speed / 3);
   const sw = Math.sin(c.phase) * amt * .7;
   c.legL.rotation.x = sw; c.legR.rotation.x = -sw;
   c.headG.rotation.z = Math.sin(c.phase) * .04 * amt;
   if (hand) c.armR.lookAt(hand);
+}
+
+/** onde a linha sai da mão (mundo). No personagem com esqueleto é a mão de verdade; devolve false nos outros. */
+export function lineHand(c, out) {
+  if (c.kind !== 'anime') return false;
+  animeHandWorld(c, out);
+  return true;
 }

@@ -5,6 +5,7 @@ import { kiteThumb } from './kite.js';
 import { $ } from './hud.js';
 import { Ads } from './platform.js';
 import { SCENE_LIST } from './world.js';
+import { RIGS } from './anime.js';
 
 const UNLOCK_KEY = 'rabiola:liberadas';
 function unlocked() { try { return new Set(JSON.parse(localStorage.getItem(UNLOCK_KEY)) || []); } catch { return new Set(); } }
@@ -203,6 +204,8 @@ function buildCharacterTab() {
 function syncCharacterTab() {
   const st = S.style;
   const mark = (rowId, v) => $(rowId).querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(v)));
+  $('tab-personagem').classList.toggle('modelo-pronto', st.model !== 'moleque');
+  if (RIGS[st.model]) $('modelCredit').textContent = 'Modelo ' + RIGS[st.model].credit;
   mark('skinRow', st.skin); mark('hairRow', st.hair); mark('hatRow', st.hat); mark('shirtRow', st.shirt); mark('shortsRow', st.shorts); mark('spoolRow', st.spool);
   markPresets($('presetRow'));
 }

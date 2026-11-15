@@ -1,5 +1,6 @@
 // Pipas: desenho (formatos, estampas, rabiola) e a física da pipa do jogador
 import * as THREE from 'three';
+import { toonMat, noOutline } from './materials.js';
 import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
 import { S, G, keys } from './state.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, setRot, forEachContact, UP } from './physics.js';
@@ -113,7 +114,7 @@ export function makeKiteMesh(type, patIdx) {
   for (let i = 0; i < pos.count; i++) pos.setZ(i, bowZ(pos.getX(i)));
   geo.computeVertexNormals();
   const tex = kiteTexture(type, patIdx);
-  const sail = mesh(geo, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: .75, alphaTest: .5 }), true, false);
+  const sail = mesh(geo, toonMat({ map: tex, side: THREE.DoubleSide, roughness: .75, alphaTest: .5 }), true, false);
   sail.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: .5 });
   tilt.add(sail);
   // varetas de bambu acompanhando a curva da vela
@@ -123,7 +124,7 @@ export function makeKiteMesh(type, patIdx) {
     for (let k = 0; k <= 8; k++) { const t = k / 8, x = lerp(ax, bx, t) * s, y = lerp(ay, by, t) * s; pts.push(new THREE.Vector3(x, y, bowZ(x) + .018)); }
     tilt.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, .012, 6), stickM, false, false));
   }
-  const lineM = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .7 });
+  const lineM = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .7, depthWrite: false }); // sem profundidade: não ganha traço de contorno
   if (kt.bridle) { // a vareta sai por cima e as linhas descem até os cantos, como nas fotos
     const topY = STICKS[kt.shape][0][1] * s, cy = b.maxY * s;
     tilt.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
@@ -153,14 +154,14 @@ export class TailRenderer {
     this.objs = [];
     if (this.style === 'bows' && n > 0) {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array((n + 1) * 3), 3));
-      this.string = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xdddddd })); this.string.frustumCulled = false;
+      this.string = new THREE.Line(g, noOutline(new THREE.LineBasicMaterial({ color: 0xdddddd }))); this.string.frustumCulled = false;
       this.objs.push(this.string);
       const bowGeo = new THREE.BufferGeometry();
       bowGeo.setAttribute('position', new THREE.Float32BufferAttribute([-.13, .05, 0, -.13, -.05, 0, 0, 0, 0, .13, .05, 0, 0, 0, 0, .13, -.05, 0], 3));
       bowGeo.computeVertexNormals();
       this.bows = [];
       for (let i = 0; i < n; i++) {
-        const bow = mesh(bowGeo, new THREE.MeshStandardMaterial({ color: i % 2 ? pat.c[0] : '#f5f5f5', side: THREE.DoubleSide, flatShading: true }), false, false);
+        const bow = mesh(bowGeo, toonMat({ color: i % 2 ? pat.c[0] : '#f5f5f5', side: THREE.DoubleSide, flatShading: true }), false, false);
         this.bows.push(bow); this.objs.push(bow);
       }
     } else if (this.style === 'fitas' && n > 0) {
@@ -231,7 +232,7 @@ const _tmpV = new THREE.Vector3();
 const LINE_N = 50;
 const lineGeo = new THREE.BufferGeometry();
 lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((LINE_N + 1) * 3), 3));
-export const lineObj = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xf7f3e8 }));
+export const lineObj = new THREE.Line(lineGeo, noOutline(new THREE.LineBasicMaterial({ color: 0xf7f3e8 })));
 lineObj.frustumCulled = false;
 scene.add(lineObj);
 

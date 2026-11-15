@@ -1,7 +1,7 @@
 // Objetos do cenário em estilo "estilizado suave": só a parte visual (sem física).
 // Usados pelo jogo (scene.js), pela vitrine e pela exportação da pasta Assets.
 import * as THREE from 'three';
-import { mesh, smat } from './materials.js';
+import { mesh, smat, toonMat } from './materials.js';
 import { makeCharacter, makeSpool, bumpy } from './player.js';
 import { makeKiteMesh, proceduralTail } from './kite.js';
 import { KITES, getPatterns, PRESETS } from './config.js';
@@ -110,7 +110,7 @@ export function grassBladeGeometry(seed = 1) {
 /** material do capim com balanço no vento (uTime/uWind atualizados pelo jogo) */
 export const grassUniforms = { uTime: { value: 0 }, uWind: { value: 1 } };
 export function grassMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
+  const m = toonMat({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
   m.onBeforeCompile = sh => {
     sh.uniforms.uTime = grassUniforms.uTime; sh.uniforms.uWind = grassUniforms.uWind;
     sh.vertexShader = 'uniform float uTime; uniform float uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -123,13 +123,14 @@ export function grassMaterial() {
       float ph = uTime * 2.2 + ip.x * 0.35 + ip.z * 0.27;
       transformed.x += (sin(ph) * 0.6 + sin(ph * 2.3) * 0.25) * hh * 0.35 * uWind;
       transformed.z += cos(ph * 0.8) * hh * 0.2 * uWind;`);
+    sh.fragmentShader = sh.fragmentShader.replace(/}\s*$/, '  gl_FragColor.a = 0.0;\n}'); // capim sem traço de contorno
   };
   return m;
 }
-export function makeGrassClump() { const m = new THREE.Mesh(grassBladeGeometry(3), new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1, color: '#6a9a38' })); m.castShadow = false; return m; }
+export function makeGrassClump() { const m = new THREE.Mesh(grassBladeGeometry(3), toonMat({ vertexColors: true, side: THREE.DoubleSide, roughness: 1, color: '#6a9a38' })); m.castShadow = false; return m; }
 
 /* ---------------- árvores fofas ---------------- */
-const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95 });
+const leafMat = toonMat({ vertexColors: true, roughness: .95 });
 const leafMatLite = new THREE.MeshLambertMaterial({ vertexColors: true });
 function blob(r, c0, c1, seed, detail = 2, lite = false) {
   const g = paintGradient(bumpy(new THREE.SphereGeometry(r, lite ? 14 : 26, lite ? 10 : 18), r * .08, 3.2 / r, seed), c0, c1, .07, seed);
@@ -193,11 +194,11 @@ export function makeHouse({ w = 7, d = 8, floors = 1, unfinished = false, color 
   const R = rng(seed + 91), g = new THREE.Group();
   const h = floors * 2.9;
   const wallM = unfinished
-    ? new THREE.MeshStandardMaterial({ map: textures.tijolo(), roughness: .95 })
-    : new THREE.MeshStandardMaterial({ map: textures.reboco(), color, roughness: .92 });
+    ? toonMat({ map: textures.tijolo(), roughness: .95 })
+    : toonMat({ map: textures.reboco(), color, roughness: .92 });
   const body = mesh(boxWorldUV(w, h, d, 2.4), wallM); body.position.y = h / 2; g.add(body);
   // laje
-  const lajeM = new THREE.MeshStandardMaterial({ map: textures.reboco(), color: '#b9b4a8', roughness: 1 });
+  const lajeM = toonMat({ map: textures.reboco(), color: '#b9b4a8', roughness: 1 });
   const slab = mesh(boxWorldUV(w + .35, .24, d + .35, 2.4), lajeM); slab.position.y = h + .12; g.add(slab);
   if (R() < .6) { const mur = mesh(boxWorldUV(w + .35, .65, .16, 2.4), wallM); mur.position.set(0, h + .56, d / 2 + .1); g.add(mur); }
   // caixa d'água
@@ -240,7 +241,7 @@ export function makeHouse({ w = 7, d = 8, floors = 1, unfinished = false, color 
 }
 
 /* ---------------- nuvens e morros ---------------- */
-const cloudM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: '#c9d6e8', emissiveIntensity: .45, fog: false });
+const cloudM = toonMat({ vertexColors: true, roughness: 1, emissive: '#c9d6e8', emissiveIntensity: .45, fog: false });
 export function makeCloud(seed = 1) {
   const R = rng(seed + 300), g = new THREE.Group();
   const n = 4 + Math.floor(R() * 4);
@@ -280,20 +281,20 @@ export function makePole() {
   const cross = mesh(new THREE.BoxGeometry(1.9, .14, .14), woodM); cross.position.y = 8.6; g.add(cross);
   for (const x of [-.8, -.3, .3, .8]) { const ins = mesh(new THREE.CylinderGeometry(.05, .06, .16, 8), smat('#e8e4d8', { roughness: .3 }), false); ins.position.set(x, 8.75, 0); g.add(ins); }
   const arm = mesh(new THREE.CylinderGeometry(.04, .04, 1.4, 8), poleM); arm.rotation.z = Math.PI / 2; arm.position.set(-.6, 7.6, 0); g.add(arm);
-  const lampMat = new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffcf6b', emissiveIntensity: 0, roughness: .4 });
+  const lampMat = toonMat({ color: '#fff3c4', emissive: '#ffcf6b', emissiveIntensity: 0, roughness: .4 });
   const head = mesh(new THREE.SphereGeometry(.24, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), smat('#6f6f6a', { side: THREE.DoubleSide })); head.position.set(-1.3, 7.55, 0); g.add(head);
   const bulb = mesh(new THREE.SphereGeometry(.14, 12, 8), lampMat, false); bulb.position.set(-1.3, 7.48, 0); g.add(bulb);
   g.userData.lampMat = lampMat;
   return g;
 }
 export function makeBall() {
-  const m = mesh(new THREE.SphereGeometry(.11, 28, 18), new THREE.MeshStandardMaterial({ map: textures.bola(), roughness: .55 }));
+  const m = mesh(new THREE.SphereGeometry(.11, 28, 18), toonMat({ map: textures.bola(), roughness: .55 }));
   m.position.y = .11;
   return m;
 }
 export function makeRing() {
   const g = new THREE.Group();
-  g.add(mesh(new THREE.TorusGeometry(2.6, .2, 12, 40), new THREE.MeshStandardMaterial({ color: '#ffd166', emissive: '#ffb703', emissiveIntensity: .7, roughness: .35, metalness: .3 })));
+  g.add(mesh(new THREE.TorusGeometry(2.6, .2, 12, 40), toonMat({ color: '#ffd166', emissive: '#ffb703', emissiveIntensity: .7, roughness: .35, metalness: .3 })));
   g.position.y = 3;
   return g;
 }
@@ -311,7 +312,8 @@ export function makeBambooPole() {
 
 /** figurante (moleque da vara) — pose de "à toa" */
 export function makeNPCKid(i = 0) {
-  const p = PRESETS[(i + 2) % PRESETS.length];
+  const simples = PRESETS.filter(q => q.style.model === 'moleque');
+  const p = simples[(i + 2) % simples.length];
   const c = makeCharacter({ ...p.style, skin: (i * 2 + 1) % 5 });
   c.g.position.set(0, 0, 0); c.g.rotation.y = 0;
   c.spool.visible = false;

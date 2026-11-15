@@ -11,6 +11,8 @@ import { Snd } from './audio.js';
 import { updateFx } from './fx.js';
 import { initNPCs, updateNPCs } from './npcs.js';
 import { updateAparadas } from './aparada.js';
+import { loadAnime } from './anime.js';
+import { createPost } from './post.js';
 import { isTouch, initTouch, updateTouch, goFullscreen } from './touch.js';
 import { LocalSession } from './bots.js';
 import { NetSession, serverURL } from './net.js';
@@ -138,7 +140,7 @@ function frame(now) {
   updateHUD(dt, cam.yaw);
   updateTouch();
   Snd.update(S.paused, S.windSpeed, lastApparent.v, S.state === 'voando', S.tension);
-  renderer.render(scene, camera);
+  post.render(scene, camera);
 }
 
 /*
@@ -153,6 +155,9 @@ function backgroundTick() {
 
 initTouch();
 
+/* acabamento anime (traço, brilho, cores); no celular fica desligado para rodar liso */
+const post = createPost(renderer, { enabled: !isTouch });
+
 /* ---------------- boot ---------------- */
 function loadAmmo() {
   return new Promise((res, rej) => {
@@ -161,7 +166,7 @@ function loadAmmo() {
   });
 }
 
-loadAmmo().then(({ lib }) => {
+Promise.all([loadAmmo(), loadAnime()]).then(([{ lib }]) => { // o personagem anime carrega junto (se falhar, usa o boneco padrão)
   initPhysics(lib);
   S.scene = buildWorld(S.scene);
   initNPCs();

@@ -25,7 +25,7 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x6b5a3a, 1.0);
+const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x7c7391, 1.0); // sombra puxando pro violeta (anime)
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 2.5);
 sun.castShadow = true;
@@ -54,15 +54,41 @@ export function makeLabel(text, color = '#fff8ea', wide = false) {
 
 /* ---------------- céu ---------------- */
 const skyMat = new THREE.ShaderMaterial({
-  uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color() } },
+  uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color() },
+    uTime: { value: 0 }, uClouds: { value: 1 }, uDay: { value: 1 } },
   vertexShader: `varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-  fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 sunCol; uniform vec3 sunDir; varying vec3 vW;
+  fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 sunCol; uniform vec3 sunDir; uniform float uTime; uniform float uClouds; uniform float uDay; varying vec3 vW;
+    float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+    float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(17.0, 9.0); a *= 0.5; } return s; }
+    // nuvens de anime: massas grandes e recortadas, claras em cima e azuladas embaixo
+    float cloud(vec3 d, float t){
+      vec2 uv = d.xz / (d.y + 0.22) * 1.15 + vec2(t * 0.006, t * 0.002);
+      float n = fbm(uv) + 0.25 * fbm(uv * 3.1 + 4.0);
+      return n;
+    }
     void main(){
       vec3 d = normalize(vW);
       float h = max(d.y, 0.0);
-      vec3 c = mix(bottom, top, pow(h, 0.5));
-      float s = max(dot(d, normalize(sunDir)), 0.0);
-      c += sunCol * (pow(s, 6.0) * 0.35 + smoothstep(0.9985, 0.9993, s) * 2.0);
+      vec3 c = mix(bottom, top, pow(h, 0.42));
+      vec3 sd = normalize(sunDir);
+      float s = max(dot(d, sd), 0.0);
+      c += sunCol * (pow(s, 6.0) * 0.32 + pow(s, 60.0) * 0.5 + smoothstep(0.9982, 0.9992, s) * 2.2);
+      if (uClouds > 0.5 && d.y > 0.0) {
+        float n = cloud(d, uTime);
+        float cover = 0.585 + 0.1 * smoothstep(0.05, 0.6, d.y);          // mais nuvem perto do horizonte, céu mais limpo no alto
+        float m = smoothstep(cover, cover + 0.035, n);                   // borda recortada (desenho)
+        float n2 = cloud(normalize(d + sd * 0.045), uTime);              // amostra na direção do sol: lado iluminado
+        float lit = smoothstep(-0.02, 0.05, n - n2);
+        float core = smoothstep(cover + 0.03, cover + 0.2, n);           // miolo mais denso = mais sombra embaixo
+        vec3 light = mix(bottom, vec3(1.0), 0.72) + sunCol * 0.22;
+        light = mix(mix(top, bottom, 0.6) * 1.9 + vec3(0.03, 0.04, 0.08), light, uDay);   // de noite: nuvem escura, só um pouco mais clara que o céu
+        vec3 shade = mix(mix(top, bottom, 0.55), vec3(0.62, 0.66, 0.82), 0.45) * (0.72 + 0.28 * length(sunCol) / 1.7);
+        vec3 cc = mix(shade, light, clamp(lit * 0.75 + (1.0 - core) * 0.45, 0.0, 1.0));
+        float fade = smoothstep(0.015, 0.14, d.y);                       // some na névoa do horizonte
+        c = mix(c, cc, m * fade * 0.94);
+      }
       if (d.y < 0.0) c = bottom;
       gl_FragColor = vec4(c, 1.0);
       #include <colorspace_fragment>
@@ -99,6 +125,8 @@ export let sunElev = 20;
 export const lampMats = []; // lâmpadas dos postes (world.js adiciona)
 
 export function updateSky(minutes, focus) {
+  skyMat.uniforms.uTime.value = performance.now() / 1000;
+  skyMat.uniforms.uDay.value = clamp((sunElev + 5) / 13, 0, 1);
   const t = clamp((minutes - 960) / 200, 0, 1); // 16:00 → 19:20
   sunElev = lerp(30, -10, t);
   let i = 0; while (i < SKY_KEYS.length - 2 && sunElev > SKY_KEYS[i + 1][0]) i++;
