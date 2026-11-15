@@ -60,13 +60,17 @@ No **online**, vale o cenário de quem **criou** a sala: quem entra com código 
 - **Cabo de guerra:**
   - **W** puxa (gasta fôlego).
   - **S** dá linha (relo).
-  - Linha firme ajuda e pipa por cima leva vantagem.
+  - **Alterne os dois:** segurar a mesma tecla rende 100% só no primeiro segundo e depois vai perdendo força.
+  - A disputa é equilibrada: todos partem da mesma força, a enroscada puxa de volta pro meio (vantagem pequena não decide)
+    e linha muito comprida responde mais devagar. Linha firme e pipa por cima ajudam só um pouquinho.
 - **Rabiola presa:** se a sua linha passar na rabiola do outro, a rabiola dele fica presa na sua linha,
   mas **ninguém perde só por isso**:
-  - Se a **linha** de quem prendeu **encostar na linha** do outro, quem teve a rabiola presa **perde na hora**.
-    A pipa dele não vira avoada: fica **pendurada pela rabiola** na linha de quem ganhou por 6 segundos,
-    e aí vem o "Aparou!" (+100 da laçada +50 da aparada). Vale também no meio de uma enroscada de linha:
-    se uma linha pegar a rabiola da outra, acabou.
+  - Se a **linha** de quem prendeu **encostar na linha** do outro, começa uma **contagem de 6 segundos** (PERIGO).
+    Se as linhas ficarem encostadas até o fim, quem teve a rabiola presa perde: a pipa dele fica **pendurada pela rabiola**
+    na linha de quem ganhou por 6 segundos, e aí vem o "Aparou!" (+100 da laçada +50 da aparada).
+    Para escapar, **afaste a sua linha da dele** (a contagem volta) e estique/sacuda a rabiola até soltar; com as linhas
+    encostadas a rabiola escorrega bem menos. Vale também no meio de uma enroscada de linha: se uma linha pegar a rabiola
+    da outra, vira rabiola presa e a contagem começa.
   - Quem foi preso **afasta a pipa da linha do outro** (A/D). A rabiola estica e vai **escorregando** até soltar pela ponta.
     Sacudir ajuda. Depois de 25 s ela solta sozinha.
 - **Pipa nas costas:** você começa (e volta depois de perder) com a pipa nas costas. Ande à vontade e aperte **E** para soltar.

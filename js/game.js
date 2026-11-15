@@ -543,8 +543,8 @@ function handleEvent(ss, e) {
       if (e.a === me || e.b === me) {
         cam.shake = .35; flashDuel();
         const other = ss.nameOf(e.a === me ? e.b : e.a);
-        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Encoste a sua linha na dele: ele perde na hora e você apara', 'good', 2.6);
-        else if (e.kind === 'rabiola') toast('Sua rabiola prendeu na linha de ' + other + '!', 'Afaste a pipa (A/D) pra escorregar · se as linhas encostarem, você perde!', 'bad', 3);
+        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Encoste a sua linha na dele e segure 6 s para aparar', 'good', 2.6);
+        else if (e.kind === 'rabiola') toast('Sua rabiola prendeu na linha de ' + other + '!', 'Afaste a pipa (A/D) pra escorregar · não deixe as linhas encostarem!', 'bad', 3);
         else toast('Enroscou com ' + other + '!', 'W puxa (gasta fôlego) · S dá linha', 'good', 2.4);
         Snd.tangle();
       }
@@ -565,6 +565,15 @@ function handleEvent(ss, e) {
       } else toast(ss.nameOf(e.winner) + ' laçou ' + ss.nameOf(e.loser), '', '', 1.6);
       break;
     }
+    case 'danger':
+      if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#e63946', 'LINHAS ENCOSTARAM! 6 s', true);
+      if (e.vic === me) { cam.shake = .4; flashDuel(); Snd.tangle(); toast('PERIGO! 6 segundos pra escapar', 'Afaste a sua linha da dele (A/D) e sacuda a rabiola', 'bad', 3); }
+      else if (e.att === me) { flashDuel(); toast('Linhas encostadas!', 'Segure 6 s encostado para aparar a pipa de ' + ss.nameOf(e.vic), 'good', 3); }
+      break;
+    case 'dangerOff':
+      if (e.vic === me) { toast('Afastou as linhas!', 'A rabiola ainda está presa: estique e sacuda', 'good', 2); Snd.ring(.8); }
+      else if (e.att === me) toast(ss.nameOf(e.vic) + ' afastou a linha', 'Encoste de novo para recomeçar a contagem', '', 2);
+      break;
     case 'tailFree':
       if (e.vic === me) { toast('A rabiola escorregou e soltou!', 'Escapou dessa', 'good', 2); Snd.ring(.8); }
       else if (e.att === me) toast('A rabiola de ' + ss.nameOf(e.vic) + ' escapou', '', '', 1.8);

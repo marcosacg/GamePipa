@@ -110,6 +110,8 @@ button:disabled { opacity: .5; cursor: wait; }
 #duelBar.taut { animation: taut .35s linear infinite; }
 @keyframes taut { 50% { border-color: var(--sun); } }
 #duel.tail { box-shadow: 0 0 0 2px var(--sun) inset; }
+#duel.danger { box-shadow: 0 0 0 3px #e63946 inset; animation: perigoDuel .5s ease-in-out infinite; }
+@keyframes perigoDuel { 50% { box-shadow: 0 0 0 3px #ffd166 inset; } }
 #duel.flash { animation: duelFlash .7s ease-out; }
 @keyframes duelFlash {
   0% { transform: scale(1.12); background: rgba(255,209,102,.85); }

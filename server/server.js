@@ -287,7 +287,7 @@ setInterval(() => {
         return { id: pid, pos: s.pos.map(r2), yaw: r2(s.yaw), mv: r2(s.mv), hand: s.hand.map(r2), k: s.k.map(r2), q: s.q.map(v => Math.round(v * 1000) / 1000), L: r2(s.L), st, pull: s.pull, shake: s.shake };
       }),
       s: room.arena.strays.map(s => ({ id: s.id, p: s.p.map(r2), kite: s.kite })),
-      d: room.arena.duels.map(d => ({ a: d.a, b: d.b, prog: r2(d.prog), x: d.x.map(r2), kind: d.kind, att: d.att, f: r2(d.f || 0), st: r2(d.stretch || 0) })),
+      d: room.arena.duels.map(d => ({ a: d.a, b: d.b, prog: r2(d.prog), x: d.x.map(r2), kind: d.kind, att: d.att, f: r2(d.f || 0), st: r2(d.stretch || 0), dg: r2(d.dg || 0) })),
     };
     if (room.scoreTimer <= 0) { snap.sc = room.arena.scores(); room.scoreTimer = 1; }
     room.broadcast(snap);
