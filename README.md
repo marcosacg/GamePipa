@@ -20,6 +20,8 @@ Modelos 3D (.glb) e texturas do jogo: pasta **[Assets](Assets/LEIA-ME.md)**.
 - Personagem “Menino de boné ★”: modelo **“Boy Idle Mixamo animation free”**, de **unbeatable**
   ([Sketchfab](https://sketchfab.com/3d-models/boy-idle-mixamo-animation-free-10bb5911f36f41ae872fb567d34d269c)), licença
   [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Adaptado para o jogo (texturas reduzidas, materiais e animação por código).
+  A caminhada vem de **“Boy Walking animation Mixamo”**, do mesmo autor
+  ([Sketchfab](https://sketchfab.com/3d-models/boy-walking-animation-mixamo-634d006e544b413d821f44ecb619a005)), CC BY 4.0.
 - Personagem “Zepeto ★”: modelo **“Zepeto Boy Model”**, de **ZEPETO EXPORTER**
   ([Sketchfab](https://sketchfab.com/3d-models/zepeto-boy-model-7a1bcd505ef041ba871867a5b612e16c)), licença
   [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). Adaptado para o jogo (esqueleto criado por código, materiais e animação).

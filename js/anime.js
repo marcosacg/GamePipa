@@ -23,7 +23,7 @@ export const RIGS = {
   },
   menino: {
     url: 'modelos/menino-bone.glb', nome: 'Menino de boné',
-    credit: '“Boy Idle Mixamo animation free”, de unbeatable (Sketchfab) · CC BY 4.0',
+    credit: '“Boy Idle Mixamo animation free” e “Boy Walking animation Mixamo”, de unbeatable (Sketchfab) · CC BY 4.0',
     turn: Math.PI, height: 1.5, top: mix('HeadTop_End'), outline: .003, softBody: true, skipOutline: null,
     bone: { hips: mix('Hips'), spine: mix('Spine'), chest: mix('Spine1'), upperChest: mix('Spine2'), neck: mix('Neck'), head: mix('Head') },
     side: s => { const S = s === 'L' ? 'Left' : 'Right'; return { shoulder: mix(S + 'Shoulder'), upper: mix(S + 'Arm'), lower: mix(S + 'ForeArm'), hand: mix(S + 'Hand'), thigh: mix(S + 'UpLeg'), shin: mix(S + 'Leg'), foot: mix(S + 'Foot'),
@@ -98,6 +98,8 @@ class B {
     this.p0 = bone.position.clone();
   }
   set(q) { this.b.quaternion.copy(this.rl).multiply(this.rwi).multiply(q).multiply(this.rw); }
+  /** o contrário do set: transforma uma rotação local (de uma animação do arquivo) em rotação nos eixos do modelo */
+  toModel(local, out) { return out.copy(this.rw).multiply(_q3.copy(this.rl).invert()).multiply(local).multiply(this.rwi); }
   reset() { this.b.quaternion.copy(this.rl); }
 }
 
@@ -163,6 +165,32 @@ export function makeAnimeCharacter(style, makeSpool, blobShadow, angerTag) {
   const hp = rig.hips.b.parent;
   rig.hipInv = hp.getWorldQuaternion(new THREE.Quaternion()).invert();
   rig.hipScale = 1 / hp.getWorldScale(new THREE.Vector3()).y;
+
+  // caminhada gravada no arquivo (animação "andar", ex.: Mixamo): usada no quadril e nas pernas no lugar do andar por código
+  const clip = (asset.animations || []).find(a => a.name === 'andar');
+  if (clip) {
+    const tr = (b, path) => clip.tracks.find(t => inst.nodes[t.node] === b.b && t.path === path);
+    const quats = t => { const o = []; for (let i = 0; i + 3 < t.values.length; i += 4) o.push(new THREE.Quaternion().fromArray(t.values, i)); o.pop(); return o; }; // o último quadro repete o primeiro
+    const w = { n: 0, parts: [], hipQ: null, hipP: null, off: 0 };
+    const hq = tr(rig.hips, 'rotation'), hpos = tr(rig.hips, 'translation');
+    if (hq) w.hipQ = quats(hq).map(q => rig.hips.toModel(q, new THREE.Quaternion()));
+    if (hpos) { w.hipP = []; for (let i = 0; i + 2 < hpos.values.length; i += 3) w.hipP.push(new THREE.Vector3(hpos.values[i] - rig.hips.p0.x, hpos.values[i + 1] - rig.hips.p0.y, 0)); w.hipP.pop(); }
+    for (const s of [rig.L, rig.R]) for (const part of ['thigh', 'shin', 'foot']) {
+      const t = tr(s[part], 'rotation'); if (t) w.parts.push({ B: s[part], q: quats(t).map(q => s[part].toModel(q, new THREE.Quaternion())) });
+      if (part === 'foot') for (const toe of s.foot.b.children) { // dedos do pé, se a animação mexer neles
+        const tb = new B(toe), tt = tr(tb, 'rotation'); if (tt) w.parts.push({ B: tb, q: quats(tt).map(q => tb.toModel(q, new THREE.Quaternion())) });
+      }
+    }
+    const th = w.parts.find(p => p.B === rig.L.thigh);
+    if (th) {
+      w.n = th.q.length;
+      // acerta o passo com o resto do corpo: acha em que quadro a coxa esquerda está mais à frente (o código usa sen(fase))
+      let sa = 0, ca = 0;
+      th.q.forEach((q, i) => { const a = 2 * Math.atan2(q.x, q.w), an = a > Math.PI ? a - 2 * Math.PI : a, f = i / w.n * Math.PI * 2; sa += an * Math.sin(f); ca += an * Math.cos(f); });
+      w.off = Math.atan2(ca, sa);
+      rig.walk = w;
+    }
+  }
 
   holder.add(pre); g.add(holder);
 
@@ -250,6 +278,15 @@ export function poseAnime(c, dt, speed, hand, angryOn, tt) {
   r.hips.b.position.copy(r.hips.p0).add(_v.set(0, bob, 0).applyQuaternion(r.hipInv).multiplyScalar(r.hipScale));
   const hipYaw = sn * .09 * amt, hipRoll = cs * .035 * amt + (amt < .05 ? Math.sin(t * .6) * .012 : 0);
   ax(Y, hipYaw, qa).multiply(ax(Z, hipRoll, qb)).multiply(ax(X, lean * .4, qcc));
+  // caminhada gravada (quando o modelo tem): quadril e pernas vêm dela; correndo, mistura com a corrida por código
+  const W = r.walk, wk = W ? amt * (1 - .45 * run) * (1 - k) : 0;
+  let wi = 0, wj = 0, wf = 0;
+  if (wk > .001) {
+    let u = ((ph - W.off) / (Math.PI * 2)) % 1; if (u < 0) u += 1;
+    u *= W.n; wi = Math.floor(u) % W.n; wj = (wi + 1) % W.n; wf = u - Math.floor(u);
+    if (W.hipQ) qa.slerp(qd.copy(W.hipQ[wi]).slerp(W.hipQ[wj], wf), wk);
+    if (W.hipP) r.hips.b.position.lerp(_v2.copy(W.hipP[wi]).lerp(W.hipP[wj], wf).add(r.hips.p0), wk);
+  }
   r.hips.set(qa); A.copy(qa);
   r.spine.set(ax(X, lean * .3 + breath, qa).multiply(ax(Y, -hipYaw * .7, qb))); A.multiply(qa);
   r.chest.set(ax(X, lean * .3 + breath, qa).multiply(ax(Y, -hipYaw * .7, qb)).multiply(ax(Z, -hipRoll, qcc))); A.multiply(qa);
@@ -280,6 +317,10 @@ export function poseAnime(c, dt, speed, hand, angryOn, tt) {
     s.shin.set(ax(X, -knee, qa));
     s.foot.set(ax(X, knee * .35 - th * .3, qa));
   }
+  if (wk > .001) for (const p of W.parts) {
+    p.B.toModel(p.B.b.quaternion, qa);                               // pose por código (ou descanso, nos dedos do pé)
+    p.B.set(qa.slerp(qd.copy(p.q[wi]).slerp(p.q[wj], wf), wk));
+  } else if (W) for (const p of W.parts) if (p.B.b.name.includes('Toe')) p.B.reset();
 
   // ---- braço da linha (direito): vai até o ponto que o jogo pede ----
   const sh = Math.sin(tt * 18);

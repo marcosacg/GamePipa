@@ -26,6 +26,10 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   - “Anime Boy for Blender”, de **Zaria** (https://sketchfab.com/3d-models/anime-boy-for-blender-3f8f011947cb4e1a9e0e97f8c38a4cc3)
   - “Boy Idle Mixamo animation free”, de **unbeatable** (https://sketchfab.com/3d-models/boy-idle-mixamo-animation-free-10bb5911f36f41ae872fb567d34d269c).
     O arquivo do jogo (`modelos/menino-bone.glb`) é uma versão enxuta do original: texturas menores, sem o mapa de relevo e sem a animação embutida.
+    A **caminhada** dele vem de “Boy Walking animation Mixamo”, do mesmo autor
+    (https://sketchfab.com/3d-models/boy-walking-animation-mixamo-634d006e544b413d821f44ecb619a005, CC BY 4.0): a animação "andar"
+    (quadril e pernas) foi copiada para dentro do `menino-bone.glb`. Os braços continuam por código (seguram a linha e o carretel)
+    e, correndo, ela é misturada com a corrida por código. Qualquer modelo que tiver uma animação chamada "andar" usa o mesmo esquema.
   - “Zepeto Boy Model”, de **ZEPETO EXPORTER** (https://sketchfab.com/3d-models/zepeto-boy-model-7a1bcd505ef041ba871867a5b612e16c).
     O original veio **sem esqueleto**: o arquivo do jogo (`modelos/zepeto-boy.glb`) ganhou 21 ossos criados por código, com a malha presa neles
     automaticamente (pela posição de cada ponto na pose de T). Ele não tem ossos de dedo, então a mão fica aberta.

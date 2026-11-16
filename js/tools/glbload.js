@@ -149,5 +149,5 @@ export async function loadGLB(url) {
     return { root, nodes, meshes, byName, skeletons, clips };
   }
 
-  return { json: J, instantiate, materials: matInfo };
+  return { json: J, instantiate, materials: matInfo, animations: anims };
 }
