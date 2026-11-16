@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mesh, smat, toonMat } from './materials.js';
 import { makeCharacter, makeSpool, bumpy } from './player.js';
 import { makeKiteMesh, proceduralTail } from './kite.js';
-import { KITES, getPatterns, PRESETS } from './config.js';
+import { KITES, getPatterns, NPC_STYLES } from './config.js';
 
 /* ---------------- utilidades ---------------- */
 export function rng(seed) { // gerador com semente (mesmo resultado sempre)
@@ -312,7 +312,7 @@ export function makeBambooPole() {
 
 /** figurante (moleque da vara) — pose de "à toa" */
 export function makeNPCKid(i = 0) {
-  const simples = PRESETS.filter(q => q.style.model === 'moleque');
+  const simples = NPC_STYLES;
   const p = simples[(i + 2) % simples.length];
   const c = makeCharacter({ ...p.style, skin: (i * 2 + 1) % 5 });
   c.g.position.set(0, 0, 0); c.g.rotation.y = 0;

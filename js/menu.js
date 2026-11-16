@@ -1,6 +1,6 @@
 // Menu: modo de jogo, sala online, personagem e pipa
 import { S } from './state.js';
-import { KITES, KITE_ORDER, getPatterns, SKINS, HAIRS, HATS, SHIRTS, SHORTS, SPOOLS, PRESETS, normalizeStyle } from './config.js';
+import { KITES, KITE_ORDER, getPatterns, SKINS, HAIRS, HATS, SHIRTS, SHORTS, LEGS, SPOOLS, PRESETS, normalizeStyle } from './config.js';
 import { kiteThumb } from './kite.js';
 import { $ } from './hud.js';
 import { Ads } from './platform.js';
@@ -188,10 +188,10 @@ function buildCharacterTab() {
   chips('hairRow', HAIRS, 'hair');
   chips('hatRow', HATS, 'hat');
   chips('spoolRow', SPOOLS, 'spool');
+  chips('legsRow', LEGS, 'legs');
   SHIRTS.forEach((s, i) => {
     const b = el('button', 'swatch'); b.title = s.name; b.dataset.v = i;
-    if (s.mode === 'sem') b.style.background = 'repeating-linear-gradient(45deg,#b07a4f 0 6px,#8d5a3b 6px 12px)';
-    else if (s.mode === 'listras') b.style.background = `repeating-linear-gradient(180deg,${s.a} 0 7px,${s.b} 7px 12px)`;
+    if (s.mode === 'listras') b.style.background = `repeating-linear-gradient(180deg,${s.a} 0 7px,${s.b} 7px 12px)`;
     else b.style.background = `linear-gradient(180deg,${s.a} 55%,${s.b} 55% 70%,${s.a} 70%)`;
     b.onclick = () => applyStyle({ shirt: i }); $('shirtRow').append(b);
   });
@@ -204,8 +204,11 @@ function buildCharacterTab() {
 function syncCharacterTab() {
   const st = S.style;
   const mark = (rowId, v) => $(rowId).querySelectorAll('button').forEach(b => b.classList.toggle('sel', b.dataset.v === String(v)));
-  $('tab-personagem').classList.toggle('modelo-pronto', st.model !== 'moleque');
-  if (RIGS[st.model]) $('modelCredit').textContent = 'Modelo ' + RIGS[st.model].credit;
+  const custom = st.model === 'moleque' || !!(RIGS[st.model] && RIGS[st.model].custom);   // dá para escolher pele, cabelo, roupa?
+  $('tab-personagem').classList.toggle('modelo-pronto', !custom);
+  $('tab-personagem').classList.toggle('modelo-boneco', st.model === 'boneco');
+  if (RIGS[st.model]) { $('modelCredit').textContent = 'Modelo ' + RIGS[st.model].credit; $('bonecoCredit').textContent = 'Modelo ' + RIGS[st.model].credit; }
+  mark('legsRow', st.legs);
   mark('skinRow', st.skin); mark('hairRow', st.hair); mark('hatRow', st.hat); mark('shirtRow', st.shirt); mark('shortsRow', st.shorts); mark('spoolRow', st.spool);
   markPresets($('presetRow'));
 }

@@ -22,6 +22,15 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 - O jogo inteiro usa o mesmo visual: sombreamento em faixas (cel shading), traço escuro no contorno dos objetos próximos,
   céu com nuvens pintadas que mudam com a hora, cores mais vivas e brilho suave. No celular o traço e o brilho ficam
   desligados para rodar liso.
+- **Boneco personalizável:** os estilos **Moleque da laje**, **Boné pra trás**, **Black power**, **Chapéu de palha** e **Trancinhas**
+  usam um personagem 3D com esqueleto (`modelos/boneco.glb`) no qual dá para escolher **pele, cabelo, chapéu, camisa e bermuda ou calça**.
+  O modelo tem uma roupa só (blusa com capuz e calça); as variações são pintadas por cima (`js/boneco.js`): a manga fica curta
+  (ou sem manga, na regata) pintando o braço com a cor da pele, e a bermuda é a calça pintada de pele do joelho pra baixo.
+  O estilo e a opção **Sem camisa** foram retirados do jogo (do boneco novo e do antigo).
+  Cabelo (menos o "Curto", que é o do modelo) e chapéus são peças simples presas na cabeça.
+  O boneco antigo de formas simples continua no jogo só para fazer a molecada figurante.
+  Modelo “Black Character”, de **Stefano.Beccaletto** (https://sketchfab.com/3d-models/black-character-9ad01d881e27477db44bb11cae72a072),
+  CC BY 4.0; versão enxuta (de 26 MB para 0,7 MB), com os ossos na pose de descanso e texturas neutras para receber cor.
 - **Crédito obrigatório dos modelos** (licença CC BY 4.0). Se publicar o jogo, mantenha (eles já aparecem no menu, na aba Personagem):
   - “Anime Boy for Blender”, de **Zaria** (https://sketchfab.com/3d-models/anime-boy-for-blender-3f8f011947cb4e1a9e0e97f8c38a4cc3)
   - “Boy Idle Mixamo animation free”, de **unbeatable** (https://sketchfab.com/3d-models/boy-idle-mixamo-animation-free-10bb5911f36f41ae872fb567d34d269c).
@@ -164,11 +173,12 @@ js/shared/terrenos.js formato do terreno de cada cenário (jogo e servidor usam 
 img/cenarios/         miniaturas dos cenários no menu
 js/kite.js            formatos/estampas das pipas, rabiola e física da pipa do jogador
 js/player.js          personagem estilizado (cabelos, bonés, camisas) e poses
+js/boneco.js          boneco personalizável com esqueleto (pele, cabelo, chapéu, camisa, bermuda/calça)
 js/dog.js             cachorro figurante (shiba) que acompanha o jogador
 js/anime.js           personagens prontos (Anime, Menino de boné, Zepeto e Garoto): carrega os modelos, materiais, e anima os ossos por código
 js/tools/glbload.js   leitor de .glb com esqueleto (para os modelos da pasta modelos/)
 js/post.js            acabamento da imagem: traço de contorno, brilho suave e cores (desligado no celular)
-modelos/              anime-boy.glb, menino-bone.glb, zepeto-boy.glb, garoto-ue4.glb e cachorro-shiba.glb (modelos 3D dos personagens prontos)
+modelos/              anime-boy.glb, menino-bone.glb, zepeto-boy.glb, garoto-ue4.glb, boneco.glb e cachorro-shiba.glb (modelos 3D dos personagens prontos)
 js/remote.js          outros jogadores e avoadas (visual)
 js/fx.js              efeitos: estouros, textos e rabiola enrolada na linha
 js/npcs.js            molecada figurante correndo com varas atrás das avoadas

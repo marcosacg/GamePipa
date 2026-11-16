@@ -2,7 +2,7 @@
 // e pela exportação da pasta Assets (ferramentas/exportar-assets.html).
 // Os modelos são os MESMOS que o jogo cria — se mudar aqui no código, é só exportar de novo.
 import * as THREE from 'three';
-import { PRESETS, KITE_ORDER, KITES, getPatterns, SPOOLS, SHIRTS } from './config.js';
+import { NPC_STYLES, KITE_ORDER, KITES, getPatterns, SPOOLS, SHIRTS } from './config.js';
 import { makeCharacter, shirtTexture, angerTexture } from './player.js';
 import { makeKiteMesh, kiteThumb } from './kite.js';
 import * as props from './props.js';
@@ -15,7 +15,7 @@ function character(style) { const c = makeCharacter(style); c.g.position.set(0, 
 /** lista de { pasta, nome, criar() } — tudo que vira .glb na pasta Assets */
 export function assetList() {
   const list = [];
-  for (const p of PRESETS.filter(p => p.style.model === 'moleque')) list.push({ pasta: 'personagens', nome: slug(p.name), criar: () => character(p.style) });
+  for (const p of NPC_STYLES) list.push({ pasta: 'personagens', nome: slug(p.name), criar: () => character(p.style) });
   list.push({ pasta: 'personagens', nome: 'figurante-com-vara', criar: () => props.makeNPCKid(0) });
   for (const type of KITE_ORDER) {
     getPatterns(type).forEach((pat, i) => {
@@ -54,7 +54,7 @@ export function textureList() {
 
 /** grupos para a vitrine */
 export const SHOWCASE = {
-  'Personagens': () => ({ items: [...PRESETS.filter(p => p.style.model === 'moleque').map(p => character(p.style)), props.makeNPCKid(1)], spacing: 1.05, focusY: 1, dist: 5.5 }),
+  'Personagens': () => ({ items: [...NPC_STYLES.map(p => character(p.style)), props.makeNPCKid(1)], spacing: 1.05, focusY: 1, dist: 5.5 }),
   'Pipas': () => ({ items: KITE_ORDER.map(t => { const k = props.kiteWithTail(t, 0); k.position.y = 1.4; return k; }), spacing: 1.7, focusY: 1, dist: 7 }),
   'Estampas': () => ({ items: KITE_ORDER.flatMap(t => getPatterns(t).slice(0, 4).map((_, i) => { const k = makeKiteMesh(t, i); k.position.y = 1 + (i % 2) * 1.3; return k; })), spacing: .9, focusY: 1.6, dist: 12 }),
   'Árvores': () => ({ items: ['mangueira', 'eucalipto', 'jamelao'].map((k, i) => props.makeTree(k, i + 2).g), spacing: 10, focusY: 5, dist: 26 }),

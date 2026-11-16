@@ -319,3 +319,7 @@ body.touch .keys { display: none; }
 .so-pronto { display: none; }
 .modelo-pronto .so-moleque { display: none; }
 .modelo-pronto .so-pronto { display: block; }
+.so-boneco, .so-boneco-inline { display: none; }
+.modelo-boneco .row.so-boneco { display: flex; }
+.modelo-boneco .hint.so-boneco { display: block; }
+.modelo-boneco .so-boneco-inline { display: inline; }

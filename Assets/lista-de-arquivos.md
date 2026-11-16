@@ -7,7 +7,6 @@
 | personagens/black-power.glb | 314 KB |
 | personagens/chapeu-de-palha.glb | 300 KB |
 | personagens/trancinhas.glb | 327 KB |
-| personagens/sem-camisa.glb | 289 KB |
 | personagens/figurante-com-vara.glb | 334 KB |
 | pipas/pipa-1.glb | 54 KB |
 | pipas/pipa-2.glb | 54 KB |

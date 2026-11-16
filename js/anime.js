@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { loadGLB } from './tools/glbload.js';
 import { toonRamp, toonRampSoft, addOutline } from './materials.js';
+import { dressBoneco, disposeBoneco } from './boneco.js';
 
 const mix = n => 'mixamorig:' + n + '_';
 /** cada modelo: arquivo, crédito, para onde olha, altura no jogo e como achar os ossos */
@@ -33,6 +34,16 @@ export const RIGS = {
     face: { eyes: /Eyes/, mouth: /Mouth/, brows: /Brows/,
       angry: { eyes: [.2, -.9], mouth: [0, -.5], brows: [0, -.4] },   // olhos semicerrados, dentes cerrados, sobrancelha franzida
       blink: { eyes: [.2, -.2] } },                                    // olhos fechados
+  },
+  // personalizável: pele, cabelo, chapéu, camisa, bermuda/calça (js/boneco.js)
+  boneco: {
+    url: 'modelos/boneco.glb', nome: 'Boneco', custom: true,
+    credit: '“Black Character”, de Stefano.Beccaletto (Sketchfab) · CC BY 4.0',
+    turn: Math.PI, height: 1.5, top: 'HeadTop_End_0', outline: .003, softBody: true, skipOutline: /Eye|Teeth/,
+    bone: { hips: 'Hips_', spine: 'Spine_', chest: 'Spine1_', upperChest: 'Spine2_', neck: 'Neck_', head: 'Head_' },
+    side: s => { const S = s === 'L' ? 'Left' : 'Right'; return { shoulder: S + 'Shoulder_', upper: S + 'Arm_', lower: S + 'ForeArm_', hand: S + 'Hand_', thigh: S + 'UpLeg_', shin: S + 'Leg_', foot: S + 'Foot_',
+      fingers: new RegExp(`^${S}Hand(Index|Middle|Ring|Pinky)[123]_`), thumb: new RegExp(`^${S}HandThumb[123]_`) }; },
+    hair: /^$/, hood: /^$/,
   },
   zepeto: {
     // este modelo veio SEM esqueleto: os ossos (Z_*) e os pesos foram criados por código (ver LEIA-ME)
@@ -128,7 +139,7 @@ export function makeAnimeCharacter(style, makeSpool, blobShadow, angerTag) {
     const info = m.userData.mat;
     m.renderOrder = info.alphaMode === 'BLEND' ? 2 : 0;
     if (info.alphaMode !== 'BLEND' && !m.material.userData.eye && !(def.skipOutline && def.skipOutline.test(info.name)))
-      addOutline(m, +((/Hair|Face/i.test(info.name) ? def.outline * .7 : def.outline) / unit).toFixed(4));
+      m.userData.outlineMesh = addOutline(m, +((/Hair|Face/i.test(info.name) ? def.outline * .7 : def.outline) / unit).toFixed(4));
   }
 
   // rosto com expressões: cada personagem ganha a sua cópia do material (para um piscar sem o outro piscar)
@@ -192,6 +203,9 @@ export function makeAnimeCharacter(style, makeSpool, blobShadow, angerTag) {
     }
   }
 
+  // boneco personalizável: cores da pele e da roupa, cabelo e chapéu conforme o estilo
+  const own = def.custom ? dressBoneco(inst, rig, style, H / H0) : null;
+
   holder.add(pre); g.add(holder);
 
   // carretel na mão esquerda (preso ao osso da mão; posição/rotação dadas nos eixos do modelo)
@@ -211,7 +225,7 @@ export function makeAnimeCharacter(style, makeSpool, blobShadow, angerTag) {
   angerTag.position.y = H + .3; angerTag.visible = false; g.add(angerTag);
 
   return {
-    kind: 'anime', model: id, g, rig, face, armR, armL, spool, handR: rig.R.hand.b, angerTag, tagY: H + .3,
+    kind: 'anime', model: id, g, rig, face, own, armR, armL, spool, handR: rig.R.hand.b, angerTag, tagY: H + .3,
     headG: new THREE.Object3D(), legL: new THREE.Object3D(), legR: new THREE.Object3D(), // só para compatibilidade
     angry: 0, phase: 0, t: Math.random() * 10, look: 0, lookYaw: 0,
   };
@@ -360,5 +374,6 @@ export function animeHandWorld(c, out) {
 export function disposeAnime(c) {
   if (c.g.parent) c.g.parent.remove(c.g);
   if (c.face) for (const m of c.face.own) { m.map.dispose(); m.dispose(); }
+  if (c.own) disposeBoneco(c.own);
   c.rig.root.traverse(s => { if (s.isSkinnedMesh && s.skeleton.boneTexture) s.skeleton.dispose(); });
 }
