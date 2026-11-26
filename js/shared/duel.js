@@ -407,7 +407,11 @@ export class Arena {
       s.age += dt;
       strayStep(s, W, t, dt);
       const gy = this.groundAt ? this.groundAt(s.p[0], s.p[2]) : 0; // chão/telhado do cenário
-      if (s.p[1] < gy + 0.5 || s.age > 70) { this.strays.splice(i, 1); continue; }
+      if (s.p[1] < gy + 0.5 || s.age > 70) {
+        // chegou no chão: a molecada da vara corre pra pegar (quem chegar primeiro leva)
+        if (s.p[1] < gy + 0.5) ev.push({ type: 'strayLanded', id: s.id, p: [s.p[0], gy, s.p[2]], kite: s.kite });
+        this.strays.splice(i, 1); continue;
+      }
       if (s.tl > 0) strayTrail(s.p, s.tl, W.dx, W.dz, 6, s.trail);
       if (s.age < 1.2) continue;
       for (const p of this.players.values()) {

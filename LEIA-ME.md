@@ -77,7 +77,7 @@ O número fica em `js/shared/versao.js` (e em `package.json`); o servidor també
   (ou sem manga, na regata) pintando o braço com a cor da pele, e a bermuda é a calça pintada de pele do joelho pra baixo.
   O estilo e a opção **Sem camisa** foram retirados do jogo (do boneco novo e do antigo).
   Cabelo (menos o "Curto", que é o do modelo) e chapéus são peças simples presas na cabeça.
-  O boneco antigo de formas simples continua no jogo só para fazer a molecada figurante.
+  O boneco antigo de formas simples só aparece se os modelos não carregarem.
   Modelo “Black Character”, de **Stefano.Beccaletto** (https://sketchfab.com/3d-models/black-character-9ad01d881e27477db44bb11cae72a072),
   CC BY 4.0; versão enxuta (de 26 MB para 0,7 MB), com os ossos na pose de descanso e texturas neutras para receber cor.
 - **Crédito obrigatório dos modelos** (licença CC BY 4.0). Se publicar o jogo, mantenha (eles já aparecem no menu, na aba Personagem):
@@ -106,6 +106,13 @@ O número fica em `js/shared/versao.js` (e em `package.json`); o servidor també
 Escolha no menu, aba **Jogar** → **Cenário**. O mundo atrás do menu já muda na hora.
 
 - **Campinho**: o campo de várzea aberto, com árvores, traves, muro pichado e a bola.
+- **Molecada da vara (figurantes)**: são os mesmos personagens do jogo (boneco personalizável com roupa sorteada, Anime,
+  Menino de boné, Zepeto e Garoto), cada um com uma vara de bambu na mão. Correm atrás das avoadas no céu com a vara
+  erguida. Quando uma avoada **cai no chão** onde eles alcançam, começa a **disputa**: todo mundo corre até ela, um esbarra
+  no outro, e **quem chegar primeiro pega**, levanta a pipa na ponta da vara e pula de alegria acenando com os braços;
+  os outros ficam bravos ("#@$%!"). Depois ele volta pro lugar mostrando a pipa. Se um jogador aparar a avoada antes de
+  cair, quem corria atrás dela fica bravo. É só visual (não dá pontos e cada jogador vê a sua molecada), mas o "caiu no
+  chão" vem da arena, então todo mundo vê a pipa cair no mesmo lugar.
 - **Laje**: em cima da laje, no meio da favela. O morro cheio de casas sobe bem na frente (é pra lá que o vento leva a pipa), com árvores no topo. Cuidado com a laje do vizinho, os fios e os "gatos" de luz. A molecada figurante fica na laje de trás.
   Na disputa (bots ou online) **cada jogador fica numa laje só dele** (são 5 lajes). Só quando a sala passa de 5 pessoas é que
   elas começam a dividir: o 6º entra na primeira laje, o 7º na segunda, e assim por diante (até 8 por sala).
@@ -242,7 +249,7 @@ js/post.js            acabamento da imagem: traço de contorno, brilho suave e c
 modelos/              anime-boy.glb, menino-bone.glb, zepeto-boy.glb, garoto-ue4.glb, boneco.glb e cachorro-shiba.glb (modelos 3D dos personagens prontos)
 js/remote.js          outros jogadores e avoadas (visual)
 js/fx.js              efeitos: estouros, textos e rabiola enrolada na linha
-js/npcs.js            molecada figurante correndo com varas atrás das avoadas
+js/npcs.js            molecada da vara: corre atrás das avoadas e disputa a pipa que cai no chão
 js/game.js            regras: jogador, câmera, missões, disputa
 js/hud.js / menu.js   interface
 js/bots.js            disputa offline contra bots

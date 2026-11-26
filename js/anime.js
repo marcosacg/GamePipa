@@ -268,6 +268,9 @@ export function poseAnime(c, dt, speed, hand, angryOn, tt) {
   const r = c.rig, t = (c.t += dt), K = r.k;
   c.angry += ((angryOn ? 1 : 0) - c.angry) * Math.min(1, dt * 8);
   const k = c.angry;
+  // feliz (c.happyOn): pula de alegria com os dois braços pro alto, acenando (ex.: moleque que aparou a pipa)
+  c.feliz = (c.feliz || 0) + ((c.happyOn ? 1 : 0) - (c.feliz || 0)) * Math.min(1, dt * 6);
+  const fz = k > .3 ? 0 : c.feliz;
   c.angerTag.visible = k > .3;
   if (c.angerTag.visible) { c.angerTag.position.y = c.tagY + Math.abs(Math.sin(tt * 6)) * .12; c.angerTag.material.rotation = Math.sin(tt * 9) * .15; }
 
@@ -316,6 +319,7 @@ export function poseAnime(c, dt, speed, hand, angryOn, tt) {
     look = Math.max(-.15, Math.min(.55, Math.atan2(_v.y + .35 * K, hl + .3 * K) * .75));
     lookYaw = Math.max(-.5, Math.min(.5, Math.atan2(-_v.x, -_v.z) * .5));
   }
+  if (fz > .3) { look = .45; lookYaw = 0; }                          // feliz: olha pro alto
   c.look += (look - c.look) * Math.min(1, dt * 5); c.lookYaw += (lookYaw - c.lookYaw) * Math.min(1, dt * 5);
   const shakeHead = Math.sin(tt * 13) * .35 * k;
   r.neck.set(ax(X, c.look * .45 - lean * .5, qa).multiply(ax(Y, c.lookYaw * .4 + shakeHead * .4, qb)));
@@ -339,11 +343,14 @@ export function poseAnime(c, dt, speed, hand, angryOn, tt) {
   // ---- braço da linha (direito): vai até o ponto que o jogo pede ----
   const sh = Math.sin(tt * 18);
   r.R.shoulder.set(ID); r.L.shoulder.set(ID);
-  if (k > .5) armIK(r, r.R, _t.set(.3 + sh * .05, 1.85 + sh * .06, -.12).multiplyScalar(K), A, _pole.set(.6, -.4, .5));   // bravo: braços pro alto, sacudindo
+  const wv = Math.sin(tt * 10);
+  if (fz > .5) armIK(r, r.R, _t.set(.34 + wv * .12, 1.95 + Math.abs(wv) * .05, -.06).multiplyScalar(K), A, _pole.set(.7, -.3, .4)); // feliz: acenando lá no alto
+  else if (k > .5) armIK(r, r.R, _t.set(.3 + sh * .05, 1.85 + sh * .06, -.12).multiplyScalar(K), A, _pole.set(.6, -.4, .5));   // bravo: braços pro alto, sacudindo
   else if (hand) { _t.copy(hand); r.holder.worldToLocal(_t); armIK(r, r.R, _t, A, _pole.set(.5, -1, .5)); }
   else armIK(r, r.R, _t.set(.21, .97 - sn * .03 * amt, -.06 + sn * .12 * amt).multiplyScalar(K), A, _pole.set(.5, -.3, 1)); // solto ao lado do corpo
   // ---- braço do carretel (esquerdo): segura o carretel na frente do corpo; andando, balança um pouco ----
-  if (k > .5) armIK(r, r.L, _t.set(-.3 - sh * .05, 1.85 - sh * .06, -.12).multiplyScalar(K), A, _pole.set(-.6, -.4, .5));
+  if (fz > .5) armIK(r, r.L, _t.set(-.34 + wv * .12, 1.95 + Math.abs(wv) * .05, -.06).multiplyScalar(K), A, _pole.set(-.7, -.3, .4));
+  else if (k > .5) armIK(r, r.L, _t.set(-.3 - sh * .05, 1.85 - sh * .06, -.12).multiplyScalar(K), A, _pole.set(-.6, -.4, .5));
   else armIK(r, r.L, _t.set(-.17 + sn * .02 * amt, 1.0 + Math.abs(sn) * .02 * amt + breath, -.26 - sn * .05 * amt).multiplyScalar(K), A, _pole.set(-.7, -1, .6));
 
   // ---- dedos fechados (segurando linha e carretel) ----

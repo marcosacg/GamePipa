@@ -7,6 +7,7 @@ import { clamp, lerp, rand, lerpAngle, segDist, noise1 } from './utils.js';
 import { windState } from './shared/wind.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, UP } from './physics.js';
 import { scene, camera, renderer, groundH, trees, SCN, collideWalk } from './scene.js';
+import { npcKiteLanded } from './npcs.js';
 import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail, cutTail, lineControl, cortarMinhaLinha } from './kite.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry, lineHand } from './player.js';
 import { RemoteView, StrayView } from './remote.js';
@@ -506,7 +507,10 @@ export function updateLogic(dt) {
       });
     } else {
       if (st.stuck) st.stuckT += dt;
-      if (st.dead || st.stuckT > 4 || st.age > 75 || _tmp.y < .7) { removeStray(st); S.strays.splice(i, 1); }
+      if (st.dead || st.stuckT > 4 || st.age > 75 || _tmp.y < .7) {
+        if (!st.dead && !st.stuck && _tmp.y < .7) npcKiteLanded(_tmp, st.kite); // caiu no chão: a molecada corre pra pegar
+        removeStray(st); S.strays.splice(i, 1);
+      }
     }
   }
 
@@ -689,6 +693,7 @@ function handleEvent(ss, e) {
       } else if (e.att === me || e.by === me) toast('A rabiola de ' + ss.nameOf(e.vic) + ' cortou', 'Puxada rápida corta a rabiola presa', '', 2);
       break;
     }
+    case 'strayLanded': npcKiteLanded(e.p, e.kite); break; // avoada caiu no chão: disputa da molecada da vara
     case 'strayIn': toast('Pipa avoada no céu!', 'Encoste a linha nela', 'good', 1.8); break;
     case 'round':
       if (e.round.state === 'pause') {
