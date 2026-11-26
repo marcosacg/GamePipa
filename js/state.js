@@ -17,13 +17,14 @@ export const S = {
   kitePos: new THREE.Vector3(0, 8, 10), kiteQ: new THREE.Quaternion(),
   mi: 0, mp: 0, missionDone: false, missionDelay: 0,
   rings: [], strays: [], ringTimer: 1, strayTimer: 6,
-  pulling: false, stamina: 1,
+  pulling: false, stamina: 1, kiteBank: 0,
   duelX: null,                   // ponto da enroscada (THREE.Vector3) quando em disputa
   tailTug: null,                 // ponto onde a linha do adversário prendeu a MINHA rabiola
   tailF: 0,                      // em que altura da rabiola ela está presa (0 = perto da pipa, 1 = ponta)
   lineLoad: false,               // a minha linha está arrastando a rabiola de alguém
   shakeT: 0, lastSteer: 0,
-  joy: { x: 0, y: 0 },           // joystick de toque (celular): -1..1       // sacudida (A/D alternado) para soltar a rabiola
+  joy: { x: 0, y: 0 },
+  limpa: (() => { try { return localStorage.getItem('rabiola.limpa') !== '0'; } catch { return true; } })(), // tela limpa: sem painéis nem avisos (tecla I)           // joystick de toque (celular): -1..1       // sacudida (A/D alternado) para soltar a rabiola
 };
 
 export const keys = {};
@@ -36,6 +37,7 @@ export const G = {
   session: null,     // sessão de disputa (bots ou online)
   remotes: new Map(),
   strayViews: new Map(),
+  pedacos: new Map(), // pedaços de linha cortada esperando a avoada/aparada nascer (física contínua)
   hangViews: new Map(),   // pipas aparadas penduradas na linha de alguém (disputa/online)
   hooks: { onFail: null },
 };

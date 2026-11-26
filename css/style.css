@@ -345,3 +345,7 @@ body.touch #cortes { bottom: 8px; }
 /* ---- carga das puxadas (puxa e descarrega) ---- */
 #cargaBar i { background: linear-gradient(90deg, #8ecae6, #219ebc); }
 #cargaBar.solta i { background: linear-gradient(90deg, #ffd166, #ff7b00); box-shadow: 0 0 8px rgba(255,140,0,.7); }
+
+/* ---- tela limpa (padrão): só o contador de cortes, a mira e os botões do celular ---- */
+body.limpa #stats, body.limpa #right, body.limpa #toast, body.limpa #launchHint, body.limpa #respawn,
+body.limpa #hint, body.limpa #kiteMark { display: none !important; }

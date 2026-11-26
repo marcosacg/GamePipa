@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { sagOf } from './shared/linha.js';
 import { noise1 } from './shared/wind.js';
 
+const ARRASTO = 1.1, PESO = 6.5, GUIA = 2.8; // vento no fio · peso da linha · mola até o formato oficial
+const _tg = new THREE.Vector3(), _acc = new THREE.Vector3();
 const _ab = new THREE.Vector3(), _side = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _t = new THREE.Vector3(), _d = new THREE.Vector3();
 
 export class Corda {
@@ -58,29 +60,39 @@ export class Corda {
     }
     this.lastA.copy(a); this.lastB.copy(b);
 
-    // tremido: ondas que correm pela linha, mais fortes com vento, no meio dela e com folga
+    /*
+      Física da linha: cada ponto tem peso, é empurrado pelo vento (arrasto só de lado, como num fio)
+      e a linha não estica (comprimento de cada trecho limitado). Uma mola bem fraca puxa para o formato
+      "oficial" (o mesmo da arena), só para o desenho não se afastar do que vale na disputa.
+      Com isso ela faz barriga sozinha, chicoteia nas cabeçadas, faz "S" quando a pipa corre e balança com as rajadas.
+    */
     _side.crossVectors(_ab, _up);
     if (_side.lengthSq() < 1e-6) _side.set(1, 0, 0); else _side.normalize();
-    const amp = (.02 + .008 * windSpeed) * Math.min(1, dist / 15) * (1 + dist / 50) * (1 + Math.min(2.5, slack * .25)) * (o.giving ? 1.6 : 1);
-
-    const segMax = (dist + (dist > .5 ? 8 * sag * sag / (3 * dist) : 0)) / n * 1.03 + .002;
-    const steps = dt > .025 ? 2 : 1, h = Math.min(dt, .05) / steps;
+    const Lr = dist + (dist > .5 ? 8 * sag * sag / (3 * dist) : 0);       // comprimento da linha entre a mão e a pipa
+    const segMax = Lr / n * 1.01 + .002;
+    const steps = dt > .02 ? 3 : 2, h = Math.min(dt, .05) / steps;
+    const gust = (.18 + .05 * windSpeed) * (o.giving ? 1.4 : 1);           // rajadinhas que correm pela linha
     for (let st = 0; st < steps; st++) {
       P[0].copy(a); P[n].copy(b);
       for (let i = 1; i < n; i++) {
-        const s = i / n, mid = Math.sin(Math.PI * s);
-        // perto da mão a folga fica mais solta (mola mais fraca)
-        const k = (ip === i ? 400 : 15 + 22 * s) * (o.giving ? .7 : 1); // mola mais mole: a linha faz "S" quando a pipa corre
-        _d.subVectors(T[i], P[i]).multiplyScalar(k);
-        const w1 = noise1(t * 1.9 - s * 5 + this.seed), w2 = noise1(t * 2.4 - s * 6 + this.seed + 31); // ondas suaves que correm pela linha
-        _d.addScaledVector(_side, w1 * amp * 22 * mid).addScaledVector(_up, w2 * amp * 12 * mid);
-        V[i].addScaledVector(_d, h).multiplyScalar(Math.exp(-9 * h));
+        const s = i / n;
+        // vento no ponto (com rajadas que andam pela linha) menos a velocidade dele = vento que ele sente
+        const w1 = noise1(t * 1.3 - s * 4 + this.seed), w2 = noise1(t * 1.7 - s * 5 + this.seed + 31);
+        _d.copy(windDirH).multiplyScalar(windSpeed * (1 + .35 * w1)).addScaledVector(_side, w2 * gust * windSpeed).addScaledVector(_up, w1 * gust * 2).sub(V[i]);
+        _tg.subVectors(P[i + 1], P[i - 1]); const tl = _tg.length() || 1; _tg.multiplyScalar(1 / tl);
+        _d.addScaledVector(_tg, -_d.dot(_tg));                              // fio: o vento só empurra de lado
+        _acc.copy(_d).multiplyScalar(ARRASTO);
+        _acc.y -= PESO;                                                     // peso da linha
+        _acc.addScaledVector(_t.subVectors(T[i], P[i]), ip === i ? 400 : GUIA); // mola fraca até o formato oficial
+        V[i].addScaledVector(_acc, h).multiplyScalar(Math.exp(-1.5 * h));
         P[i].addScaledVector(V[i], h);
       }
       if (ip > 0) { P[ip].copy(o.pin); V[ip].set(0, 0, 0); }
-      // a linha não estica: nenhum trecho fica maior que o comprimento dela permite
-      for (let it = 0; it < 3; it++) {
-        for (let i = 0; i < n; i++) {
+      // a linha não estica: vai e volta pela linha algumas vezes encurtando os trechos compridos
+      for (let it = 0; it < 6; it++) {
+        const fwd = it % 2 === 0;
+        for (let q = 0; q < n; q++) {
+          const i = fwd ? q : n - 1 - q;
           _t.subVectors(P[i + 1], P[i]);
           const l = _t.length();
           if (l <= segMax) continue;
@@ -88,6 +100,9 @@ export class Corda {
           const fa = i === 0 || i === ip ? 0 : i + 1 === n || i + 1 === ip ? 1 : .5;
           P[i].addScaledVector(_t, c * fa);
           P[i + 1].addScaledVector(_t, -c * (1 - fa));
+          // o que a linha segurou vira velocidade a menos (senão ela "vibra")
+          if (fa > 0) V[i].addScaledVector(_t, c * fa / h * .5);
+          if (fa < 1) V[i + 1].addScaledVector(_t, -c * (1 - fa) / h * .5);
         }
       }
     }

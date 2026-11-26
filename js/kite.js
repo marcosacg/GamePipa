@@ -2,6 +2,9 @@
 import * as THREE from 'three';
 import { toonMat, noOutline } from './materials.js';
 import { Corda } from './corda.js';
+import { LinhaSolta, cortarEm } from './linhasolta.js';
+import { flutter } from './rabiola.js';
+const _fl = new THREE.Vector3(), _flS = new THREE.Vector3();
 import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE, MAX_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
 import { S, G, keys } from './state.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, setRot, forEachContact, UP } from './physics.js';
@@ -458,6 +461,9 @@ const _p = new THREE.Vector3(), _v = new THREE.Vector3(), _d = new THREE.Vector3
   _a = new THREE.Vector3(), _eUp = new THREE.Vector3(0, 1, 0), _prevUp = new THREE.Vector3(0, 1, 0), _eR = new THREE.Vector3(), _nose = new THREE.Vector3(),
   _tmp = new THREE.Vector3(), _negU = new THREE.Vector3(), _bx = new THREE.Vector3(), _w = new THREE.Vector3();
 const _m4 = new THREE.Matrix4(), _tq = new THREE.Quaternion(), ZERO_V = new THREE.Vector3();
+const _qb = new THREE.Quaternion(), _zAx = new THREE.Vector3(0, 0, 1), _xAx = new THREE.Vector3(1, 0, 0);
+const LINHA_KG_M = .0004; // linha de pipa: ~0,4 g por metro
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const lastApparent = { v: 0 };
 
 export function kitePhysicsStep(h, strayBodies) {
@@ -551,6 +557,8 @@ export function kitePhysicsStep(h, strayBodies) {
       _f.addScaledVector(_u, -T);
     }
     if (S.lineLoad) T += 1.2 + .4 * S.windSpeed / 6; // a rabiola do outro pesa na minha linha
+    // o peso da própria linha: metade dela fica "pendurada" na pipa (linha longa = pipa mais baixa)
+    _f.y -= LINHA_KG_M * S.L * 9.81 * .5;
     S.rawT = T;
     force(body, _f);
 
@@ -558,7 +566,14 @@ export function kitePhysicsStep(h, strayBodies) {
     _bx.crossVectors(_nose, _negU).normalize();
     _m4.makeBasis(_bx, _nose, _negU);
     _tq.setFromRotationMatrix(_m4);
-    S.kiteQ.slerp(_tq, 1 - Math.exp(-12 * h));
+    // a pipa "deita" nas curvas (inclina para o lado em que está indo) e treme com o vento no pano
+    const side = _v.dot(_eR);
+    S.kiteBank += (clamp(-side * .045, -.55, .55) - S.kiteBank) * (1 - Math.exp(-6 * h));
+    const flut = Math.min(1, amag / 12) * (.03 + .05 * (1 - tf));
+    _tq.multiply(_qb.setFromAxisAngle(_zAx, S.kiteBank + noise1(S.clock * 9.5) * flut))
+      .multiply(_qb.setFromAxisAngle(_xAx, noise1(S.clock * 8.3 + 5) * flut * .8));
+    // com a linha esticada ela vira rápido; frouxa, gira solta (inércia)
+    S.kiteQ.slerp(_tq, 1 - Math.exp(-(4 + 9 * tf) * h));
     setRot(body, S.kiteQ);
 
     // "esforço" da linha = tensão média (~0,4 s) + trancos limitados: rajada rápida não arrebenta
@@ -593,6 +608,10 @@ export function kitePhysicsStep(h, strayBodies) {
     }
     windAt(_tmp, _w); _a.subVectors(_w, _v);
     _f.copy(_a).multiplyScalar(.0015 * _a.length());
+    // tremido da fita: ondas que correm do pé até a ponta (mais fortes com vento e na ponta)
+    flutter(S.clock, i + 1, 3, S.windSpeed, _fl);
+    _f.addScaledVector(_flS.set(-S.windDirH.z, 0, S.windDirH.x), _fl.x * .004).addScaledVector(S.windDirH, _fl.z * .004);
+    _f.y += _fl.y * .004;
     force(lb, _f);
   });
 
@@ -665,21 +684,42 @@ export function syncKiteVisual() {
  * porque em primeira pessoa a linha sai da mão que aparece na tela (S.lineFrom / S.spoolFrom).
  */
 const myRope = new Corda(LINE_N - 1, 3.7);
+let myCut = null; // o pedaço de linha solto que ficou na mão depois do corte
+/**
+ * Corta a minha linha no ponto x (onde a linha do outro passou), ou perto da pipa (x = null: arrebentou).
+ * O pedaço da mão até o corte vira linha solta presa na mão; devolve o pedaço do corte até a pipa
+ * (começando na pipa), que vai com a avoada.
+ */
+export function cortarMinhaLinha(x) {
+  const P = myRope.ok ? myRope.p : [S.hand.clone(), S.kitePos.clone()];
+  const X = x ? (x.isVector3 ? x : new THREE.Vector3().fromArray(x)) : P[Math.max(1, P.length - 3)];
+  const r = cortarEm(P, X);
+  myCut = new LinhaSolta(r.mao, LINE_N - 1, { chao: groundH });
+  // a linha estava esticada: no corte ela "estala" e volta um pouco em direção à mão
+  myCut.kick(_cutV.subVectors(S.hand, r.c).setLength(Math.min(6, 2 + S.tension * 4)));
+  return r.pipa;
+}
+const _cutV = new THREE.Vector3();
+const _linCor = new THREE.Color(0xf7f3e8), _linPerigo = new THREE.Color(0xff3b30);
 export function updateMyLine(dt) {
   const lp = lineGeo.attributes.position;
   const from = S.lineFrom || S.hand, spool = S.spoolFrom || S.spoolPos;
   if (S.state === 'arrebentou') {
-    // arrebentou: sobra um pedacinho de linha caindo da mão
-    for (let i = 0; i <= LINE_N; i++) {
-      const t = i / LINE_N;
-      lp.setXYZ(i, from.x + S.windDirH.x * t * 3, from.y - t * 1.2 - Math.sin(t * 3) * .2, from.z + S.windDirH.z * t * 3);
-    }
-    lp.needsUpdate = true;
+    // cortada/arrebentada: o pedaço que ficou na mão cai solto, com física, do formato exato que tinha
+    if (!myCut) cortarMinhaLinha(null);
+    lp.setXYZ(0, spool.x, spool.y, spool.z);
+    if (S.stateTimer > 1.2) myCut.recolher(Math.min(myCut.len - 1, 7 * dt)); // e o jogador vai recolhendo
+    myCut.update(dt, from, S.windDirH, S.windSpeed, S.clock);
+    myCut.write(lp, 1);
+    lineObj.material.color.copy(_linCor);
     myRope.reset();
     return;
   }
+  myCut = null;
   if (!lineObj.visible) { myRope.reset(); return; }
   lp.setXYZ(0, spool.x, spool.y, spool.z);
+  const lim = G.kite.kt.breakN * LINE_STRENGTH, perigo = Math.max(0, Math.min(1, (S.stress / lim - .6) / .35)) + (S.overT > 0 ? .3 : 0);
+  lineObj.material.color.copy(_linCor).lerp(_linPerigo, Math.min(1, perigo) * (.6 + .4 * Math.sin(S.clock * 18) ** 2));
   const L = S.state === 'voando' ? S.L : from.distanceTo(S.kitePos) + 1;
   myRope.update(dt, from, S.kitePos, L, S.windDirH, S.windSpeed, S.clock, { pin: S.duelX, giving: !!keys.KeyS && S.state === 'voando' });
   myRope.write(lp, 1);

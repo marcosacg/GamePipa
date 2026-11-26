@@ -10,6 +10,7 @@ export const $ = id => document.getElementById(id);
 
 let toastT = 0;
 export function toast(t, sub = '', cls = '', dur = 2) {
+  if (S.limpa && S.running) return; // tela limpa: sem avisos
   const el = $('toast');
   el.className = 'show ' + cls;
   el.innerHTML = '';
@@ -52,8 +53,14 @@ function updateCortes() {
     cortesShown = n;
   }
 }
+/** liga/desliga a tela limpa (tecla I / botão ⓘ) */
+export function toggleLimpa() {
+  S.limpa = !S.limpa;
+  try { localStorage.setItem('rabiola.limpa', S.limpa ? '1' : '0'); } catch { }
+}
 export function updateHUD(dt, camYaw) {
   updateCortes();
+  document.body.classList.toggle('limpa', S.limpa && S.running);
   // carga das puxadas (puxa e descarrega)
   const cg = S.carga || 0;
   $('hCarga').textContent = S.descarga > 0 ? 'soltando!' : Math.round(cg * 100) + '%';
@@ -159,26 +166,16 @@ function updateDisputaHUD() {
     const mine = d.a === ss.myId ? d.prog : -d.prog; // -1..1, positivo = ganhando
     const other = d.a === ss.myId ? d.b : d.a;
     const name = ss.nameOf(other);
-    const dg = d.kind === 'rabiola' ? (d.dg || 0) : 0, falta = Math.max(0, Math.ceil(DUEL.dangerTime - dg));
-    $('duel').classList.toggle('danger', dg > 0);
-    if (dg > 0 && d.att === ss.myId) { $('duelTitle').textContent = 'Linhas encostadas! Segure ' + falta + ' s:'; $('duelKeys').innerHTML = 'Mantenha a <b>sua linha</b> encostada na dele até o fim para <b>aparar</b>'; }
-    else if (dg > 0) { $('duelTitle').textContent = 'PERIGO! ' + falta + ' s para escapar de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> <b>afaste a sua linha da dele</b> (a contagem volta) e sacuda pra rabiola soltar'; }
-    else if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na dele e segure ' + DUEL.dangerTime + ' s para <b>aparar</b>'; }
-    else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola prendeu na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> afaste a pipa pra esticar · sacudir ajuda · <b>não deixe as linhas encostarem!</b>'; }
+    if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Cruze a <b>sua linha</b> na dele e corte: ela fica <b>aparada</b> na sua'; }
+    else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola enroscou na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> estique/sacuda · <kbd>W</kbd> puxada rápida corta a rabiola'; }
     else { $('duelTitle').textContent = 'CRUZOU com'; $('duelKeys').innerHTML = '<b>Mexa a linha!</b> <kbd>W</kbd> puxada · <kbd>S</kbd> relo · passe a pipa rápido · quem fica parado é cortado'; }
     $('duelName').textContent = name;
     $('duel').classList.toggle('tail', d.kind === 'rabiola');
     if (d.kind === 'rabiola') {
       // barra = quanto a rabiola já escorregou (verde = perto de soltar, do ponto de vista de quem foi preso)
       const f = d.f || 0, vic = d.att !== ss.myId;
-      if (dg > 0) { // em perigo a barra vira o relógio da contagem
-        const k = dg / DUEL.dangerTime;
-        $('duelBar').firstElementChild.style.width = ((vic ? 1 - k : k) * 100).toFixed(0) + '%';
-        $('legL').textContent = vic ? 'tempo pra escapar' : 'aparando'; $('legR').textContent = falta + ' s';
-      } else {
-        $('duelBar').firstElementChild.style.width = ((vic ? f : 1 - f) * 100).toFixed(0) + '%';
-        $('legL').textContent = vic ? 'escorregando' : 'segurando'; $('legR').textContent = vic ? 'presa' : 'escapando';
-      }
+      $('duelBar').firstElementChild.style.width = ((vic ? f : 1 - f) * 100).toFixed(0) + '%';
+      $('legL').textContent = vic ? 'escorregando' : 'segurando'; $('legR').textContent = vic ? 'presa' : 'escapando';
       $('duelBar').classList.toggle('taut', (d.st || d.stretch || 0) > .05);
     } else {
       $('duelBar').firstElementChild.style.width = ((mine + 1) * 50).toFixed(0) + '%';

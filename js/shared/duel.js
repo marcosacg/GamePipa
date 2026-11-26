@@ -1,10 +1,10 @@
 // Arena de disputa: detecta linhas que se cruzam (enroscada), resolve o cabo de guerra
 // e controla as pipas avoadas. Roda no servidor (online) e no navegador (contra bots).
-// Corte rápido: quando as linhas cruzam, quem está MEXENDO a linha naquele instante (puxando, dando linha
-// ou passando a pipa rápido por cima) corta a do outro em 1 a 2 segundos. Quem fica parado é cortado.
+// Corte como linha com cerol: cruzou, quem passar a linha mais rápido no cruzamento (puxada forte, pipa correndo,
+// relo) corta a do outro em fração de segundo. Quem fica parado é cortado.
 // As linhas têm barriga (js/shared/linha.js): o enrosco é calculado no formato que aparece na tela.
 
-import { windState } from './wind.js';
+import { windState, noise1 } from './wind.js';
 import { lineShape, polyPoly, pointPoly, strayTrail, heightWind, POLY_N } from './linha.js';
 
 export const DUEL = {
@@ -12,12 +12,12 @@ export const DUEL = {
   minFrac: 0.12,     // não enrosca colado na mão...
   maxFrac: 0.97,     // ...nem exatamente na pipa
   minLine: 8,        // linha mínima para entrar em disputa
-  maxTime: 8,        // ninguém mexeu a linha: depois disso elas desenroscam (empate)
-  speed: 1.15,       // rapidez do corte: vantagem de 1 corta em ~1 s
-  centro: 0.35,      // os dois parados (ou empatados): o corte volta aos poucos pro meio
-  folego: 1.5,       // segurar a mesma tecla (W ou S) rende 100% por esse tempo (s)...
-  cansa: 2.0,        // ...e depois vai caindo até 35% nesse tempo: o certo é alternar puxada e relo
-  manobra: 0.06,     // passar a pipa rápido pela linha do outro também corta: +0,06 por m/s (até 15 m/s)
+  maxTime: 5,        // ninguém mexeu a linha: depois disso elas desenroscam (empate)
+  speed: 2.2,        // rapidez do corte (cerol): puxada contra quem está parado corta em ~0,3 s
+  centro: 0.6,       // os dois parados (ou empatados): o corte volta pro meio
+  folego: 2,         // segurar a mesma tecla rende 100% por esse tempo (s)...
+  cansa: 2.5,        // ...e depois cai até 60%
+  manobra: 0.1,      // linha passando rápido no cruzamento (pipa correndo) corta: +0,1 por m/s (até 15 m/s)
   // puxada rápida = puxar (W) com a pipa correndo mais que isso (m/s): corta rabiola presa ou pendurada
   rapida: 7,
   rasga: 0.55,       // quão rápido a rabiola corta na puxada rápida (por m/s acima do limite, por segundo)
@@ -28,9 +28,7 @@ export const DUEL = {
   guardaBonus: 50,   // pontos por trazer a aparada até a mão
   toqueAparada: 1.3, // linha de outro jogador a essa distância da pipa pendurada corta a rabiola (vira avoada)
   linhaLonga: 0.25,  // linha muito comprida responde mais devagar (até -25% na puxada/relo, de 35 m a 100 m)
-  dangerTime: 1,     // rabiola presa + linhas encostadas: tempo (s) que a vítima tem para escapar antes de ser aparada
-  dangerCool: 1.5,   // com as linhas afastadas, o contador volta nessa velocidade
-  dangerGrip: 0.35,  // com as linhas encostadas a rabiola fica mais enrolada: escorrega só 35%
+  cortaRabiola: 9,   // linha passando na rabiola com a pipa a mais que isso (m/s), ou na puxada rápida: o cerol corta a rabiola
   cooldown: 4,       // tempo até o mesmo par poder enroscar de novo
   catchDist: 1.8,    // distância para aparar uma avoada com a linha
   tailTouch: 1.4,    // distância da linha até a rabiola do outro para "pegar a rabiola"
@@ -47,7 +45,7 @@ export const DUEL = {
 export const KITE_TYPES = ['pipa', 'raia', 'capucheta', 'bico', 'quadrada'];
 
 // versão das regras/mensagens: se o servidor rodando for mais velho que os arquivos, o jogo avisa
-export const PROTOCOL = 11; // 11: aparada pendurada na arena (hg), puxada rápida corta rabiola
+export const PROTOCOL = 14; // 14: corte no ponto exato (sid/tl no duelEnd), avoada com física · 13: rabiola: cerol corta passando rápido; presa + linhas cruzadas = corte normal (sem contagem)
 export const SCENES = ['campinho', 'laje', 'morro'];
 
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -107,13 +105,13 @@ export function tailEndFromWind(k, W, n) {
  * - linha muito comprida responde mais devagar (não adianta só ficar longe)
  * h = { p, g }: há quanto tempo ele está segurando a puxada / o relo
  */
-const fresh = hold => cl(1 - (hold - DUEL.folego) / DUEL.cansa, 0.35, 1);
+const fresh = hold => cl(1 - (hold - DUEL.folego) / DUEL.cansa, 0.6, 1);
 export function duelPower(P, h = null) {
   const p = P.s || P;
   const resp = 1 - DUEL.linhaLonga * cl(((p.L || 0) - 35) / 65, 0, 1);
   let pw = 0;
   if (p.pull && (p.sta || 0) > 0.02) pw += 1.0 * resp * fresh(h ? h.p : 0);
-  else if (p.give) pw += 0.8 * resp * fresh(h ? h.g : 0);
+  else if (p.give) pw += 0.6 * resp * fresh(h ? h.g : 0); // relo corta menos que a puxada
   pw += DUEL.manobra * Math.min(15, P.ks || 0);
   return pw;
 }
@@ -124,6 +122,40 @@ export function fastPull(P) {
   return Math.max(0, (P.ks || 0) - DUEL.rapida);
 }
 /** ponto da polilinha na fração f (0 = mão, 1 = pipa) */
+/** comprimento da linha do jogador P do ponto x até a pipa (ao longo da linha com barriga) */
+function cutLen(P, x) {
+  const A = P.poly;
+  if (!A || !x) return 0;
+  const u = pointPoly(x, A).u, n = A.length - 1;
+  let L = 0;
+  for (let i = 0; i < n; i++) {
+    const a = A[i], b = A[i + 1], sl = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const s0 = i / n, s1 = (i + 1) / n;
+    if (s1 <= u) continue;
+    L += sl * (s0 >= u ? 1 : (s1 - u) * n);
+  }
+  return L;
+}
+/*
+  Avoada com física (sem balanço de enfeite): massa no ar, arrastada pelo vento (que muda com a altura e
+  tem rajadas), sustentação que vai e volta conforme a pipa rodopia, peso da pipa + o pedaço de linha.
+  Começa com a velocidade que a pipa tinha na hora do corte (ela "escapa" e depois vai com o vento).
+*/
+const STRAY = { massa: .16, arrasto: .9, linhaKg: .0004 };
+function strayStep(s, W, t, dt) {
+  const v = s.v || (s.v = [0, 0, 0]);
+  const hf = heightWind(s.p[1]), g1 = noise1(t * .9 + s.ph * 7), g2 = noise1(t * 1.3 + s.ph * 5 + 11), g3 = noise1(t * .6 + s.ph * 3 + 29);
+  const ws = W.speed * hf * .82 * (1 + .25 * g1); // a linha que ela arrasta segura um pouco
+  const wx = W.dx * ws - W.dz * ws * .35 * g2, wz = W.dz * ws + W.dx * ws * .35 * g2;
+  const peso = 9.81 * (1 + Math.min(80, s.tl || 0) * STRAY.linhaKg / STRAY.massa);
+  const sust = 9.81 * (.9 + .3 * g3);                   // o pano rodopiando ora segura, ora não
+  const k = STRAY.arrasto;
+  v[0] += (k * (wx - v[0])) * dt;
+  v[1] += (k * (0 - v[1]) * 1.4 + sust - peso) * dt;
+  v[2] += (k * (wz - v[2])) * dt;
+  s.p[0] += v[0] * dt; s.p[1] += v[1] * dt; s.p[2] += v[2] * dt;
+}
+
 function polyAt(A, f) {
   const n = A.length - 1, x = cl(f, 0, 1) * n, i = Math.min(n - 1, Math.floor(x)), u = x - i;
   return [A[i][0] + (A[i + 1][0] - A[i][0]) * u, A[i][1] + (A[i + 1][1] - A[i][1]) * u, A[i][2] + (A[i + 1][2] - A[i][2]) * u];
@@ -175,15 +207,17 @@ export class Arena {
   }
 
   /** tl = pedaço de linha que a avoada vai arrastando (m) */
-  spawnStray(pos, kite, owner = null, tl = 0) {
-    this.strays.push({ id: this.sid++, p: [pos[0], pos[1], pos[2]], ph: Math.random() * 6.28, age: 0, kite, owner, tl: cl(tl, 0, 60), trail: [] });
+  spawnStray(pos, kite, owner = null, tl = 0, v = null) {
+    const s = { id: this.sid++, p: [pos[0], pos[1], pos[2]], v: v ? v.slice() : [0, 0, 0], ph: Math.random() * 6.28, age: 0, kite, owner, tl: cl(tl, 0, 80), trail: [] };
+    this.strays.push(s);
+    return s;
   }
 
   /** pendura a pipa (kite) na linha de "by", na fração f; why = 'aparada' (rabiola) ou 'catch' (avoada) */
-  hang(by, kite, f, owner, from, why, ev) {
+  hang(by, kite, f, owner, from, why, ev, tl = 8) {
     const h = { id: this.sid++, by, kite, f: cl(f, 0.05, 0.98), owner, age: 0, rip: 0 };
     this.hangs.push(h);
-    ev.push({ type: 'hang', id: h.id, by, kite, f: h.f, owner, from: from ? from.slice() : null, why });
+    ev.push({ type: 'hang', id: h.id, by, kite, f: h.f, owner, from: from ? from.slice() : null, why, tl: h.tl = tl });
     return h;
   }
 
@@ -208,6 +242,8 @@ export class Arena {
       if (p.lastK && t - p.lastKT > 0.03) {
         const v = Math.hypot(p.s.k[0] - p.lastK[0], p.s.k[1] - p.lastK[1], p.s.k[2] - p.lastK[2]) / (t - p.lastKT);
         p.ks = (p.ks || 0) * 0.6 + Math.min(40, v) * 0.4;
+        const it = 1 / (t - p.lastKT), kv = p.kv || (p.kv = [0, 0, 0]);
+        for (let q = 0; q < 3; q++) kv[q] = kv[q] * 0.5 + cl((p.s.k[q] - p.lastK[q]) * it, -30, 30) * 0.5;
       }
       if (!p.lastK || t - p.lastKT > 0.03) { p.lastK = p.s.k.slice(); p.lastKT = t; }
     }
@@ -216,54 +252,45 @@ export class Arena {
     for (let i = this.duels.length - 1; i >= 0; i--) {
       const d = this.duels[i];
       const A = this.players.get(d.a), B = this.players.get(d.b);
-      /* aparada = true: a rabiola do perdedor ficou presa na linha do vencedor com as linhas encostadas por 1 s.
-         A pipa dele não vira avoada: fica pendurada pela rabiola na linha de quem ganhou. */
+      /* aparada = a rabiola do perdedor estava presa na linha de quem ganhou o corte: a pipa dele não sai
+         avoada, fica pendurada pela rabiola na linha do vencedor. */
       const end = (w, l, aparada = false) => {
+        if (d.pr && w === d.att) aparada = true;
         this.duels.splice(i, 1);
         this.cool.set(key(d.a, d.b), DUEL.cooldown);
         if (w) {
           const Wp = this.players.get(w), Lp = this.players.get(l);
           if (Wp) { Wp.score += 100; Wp.lacadas++; if (aparada) { Wp.score += DUEL.aparadaBonus; Wp.aparadas++; } }
           if (Lp) Lp.lostUntil = t + DUEL.lostTime;
-          if (!aparada && Lp && Lp.s && Lp.s.k[1] > 2) {
-            // a pipa dele sai arrastando o pedaço de linha do corte até ela
-            const cx = d.x || Lp.s.hand, tl = Math.hypot(Lp.s.k[0] - cx[0], Lp.s.k[1] - cx[1], Lp.s.k[2] - cx[2]) * 0.9;
-            this.spawnStray(Lp.s.k, Lp.kite, l, Math.max(6, tl));
-          }
-          ev.push({ type: 'duelEnd', winner: w, loser: l, x: d.x, kind: d.kind, aparada,
+          // a linha dele corta EXATAMENTE no ponto do cruzamento: o pedaço do corte até a pipa vai com ela
+          const tl = Lp && Lp.s ? cutLen(Lp, d.x) : 0;
+          let sid = null;
+          if (!aparada && Lp && Lp.s && Lp.s.k[1] > 2) sid = this.spawnStray(Lp.s.k, Lp.kite, l, Math.max(2, tl), Lp.kv).id;
+          ev.push({ type: 'duelEnd', winner: w, loser: l, x: d.x, kind: d.kind, aparada, sid, tl,
             k: Lp && Lp.s ? Lp.s.k.slice() : null, kite: Lp ? Lp.kite : null });
           // aparada: a pipa dele fica pendurada pela rabiola na linha de quem ganhou (e não some)
-          if (aparada && Wp && Wp.poly && Lp) this.hang(w, Lp.kite, pointPoly(d.x || Wp.s.k, Wp.poly).u, l, Lp.s ? Lp.s.k : d.x, 'aparada', ev);
+          if (aparada && Wp && Wp.poly && Lp) this.hang(w, Lp.kite, pointPoly(d.tx || d.x || Wp.s.k, Wp.poly).u, l, Lp.s ? Lp.s.k : d.x, 'aparada', ev, Math.max(2, tl));
         } else ev.push({ type: 'duelDraw', a: d.a, b: d.b });
       };
       if (!A || !B) { end(null); continue; }
       const fa = flying(A), fb = flying(B);
       if (d.kind === 'rabiola') {
         /*
-          RABIOLA PRESA: ninguém perde só por isso.
-          - Se as LINHAS também se encostarem, começa uma contagem de 1 s (PERIGO). Se as linhas ficarem
-            encostadas até o fim, quem teve a rabiola presa perde e a pipa dele fica pendurada (aparada)
-            na linha de quem prendeu.
-          - Para escapar: afastar as linhas (a contagem volta) e esticar/sacudir a rabiola até ela soltar.
-            Com as linhas encostadas a rabiola fica mais enrolada e escorrega bem menos.
+          RABIOLA PRESA (enroscou devagar): a pipa presa é arrastada pela linha do outro.
+          - Escapa esticando/sacudindo (a rabiola escorrega até soltar pela ponta) ou cortando a rabiola com puxada rápida.
+          - Se as LINHAS se cruzarem, vira corte normal (cerol). Se a presa for cortada, fica pendurada pela rabiola
+            na linha de quem cortou (aparada); se quem prendeu for cortado, a outra escapa.
         */
         if (!fa || !fb) { end(null); continue; } // alguém caiu por conta própria: só desprende
         const att = d.att === d.a ? A : B, vic = d.att === d.a ? B : A;
         const ts = tailSeg(vic.s);
         if (!ts) { end(null); continue; }
         const rl = lineLine(A, B);
-        const junto = rl.d < DUEL.touch * (d.dg > 0 ? 1.4 : 1) && rl.s > DUEL.minFrac * .5 && rl.s < .99 && rl.t > DUEL.minFrac * .5 && rl.t < .99;
-        if (junto) {
-          if (!(d.dg > 0)) ev.push({ type: 'danger', att: att.id, vic: vic.id, x: [(rl.c1[0] + rl.c2[0]) / 2, (rl.c1[1] + rl.c2[1]) / 2, (rl.c1[2] + rl.c2[2]) / 2] });
-          d.dg = (d.dg || 0) + dt;
-          if (d.dg >= DUEL.dangerTime) {
-            d.x = [(rl.c1[0] + rl.c2[0]) / 2, (rl.c1[1] + rl.c2[1]) / 2, (rl.c1[2] + rl.c2[2]) / 2];
-            end(att.id, vic.id, true);
-            continue;
-          }
-        } else if (d.dg > 0) {
-          d.dg = Math.max(0, d.dg - dt * DUEL.dangerCool);
-          if (d.dg === 0) ev.push({ type: 'dangerOff', att: att.id, vic: vic.id });
+        if (rl.d < DUEL.touch && rl.s > DUEL.minFrac * .5 && rl.s < .99 && rl.t > DUEL.minFrac * .5 && rl.t < .99) {
+          d.kind = 'linha'; d.pr = true; d.tx = d.x; d.prog = 0; d.t = 0;
+          d.x = [(rl.c1[0] + rl.c2[0]) / 2, (rl.c1[1] + rl.c2[1]) / 2, (rl.c1[2] + rl.c2[2]) / 2];
+          ev.push({ type: 'duelStart', a: d.a, b: d.b, x: d.x, kind: 'linha', att: d.att, pr: true });
+          continue;
         }
         // puxada rápida (de qualquer um dos dois) com a rabiola presa: a linha corta a rabiola no ponto preso
         const rr = fastPull(att) + fastPull(vic);
@@ -283,7 +310,7 @@ export class Arena {
         const reach = pointPoly(vic.s.k, att.poly).d;
         const held = .6 + d.f * tl;
         d.stretch = cl((reach - held) / 2, 0, 1);
-        const slide = (Math.max(0, reach - held) * DUEL.slideRate + (vic.s.shake ? DUEL.shakeSlide * tl : 0)) * dt / tl * (junto ? DUEL.dangerGrip : 1);
+        const slide = (Math.max(0, reach - held) * DUEL.slideRate + (vic.s.shake ? DUEL.shakeSlide * tl : 0)) * dt / tl;
         d.f = Math.min(1, d.f + slide);
         d.t += dt;
         if (d.f >= .98 || d.t > DUEL.snagTime) {
@@ -297,14 +324,8 @@ export class Arena {
       {
         const r = lineLine(A, B);
         d.x = [(r.c1[0] + r.c2[0]) / 2, (r.c1[1] + r.c2[1]) / 2, (r.c1[2] + r.c2[2]) / 2];
-        // linha com linha E a linha pegou a rabiola do outro: vira "rabiola presa" e começa a contagem de 1 s
-        const ta = lineOnTail(A, B, DUEL.tailTouch * 1.3), tb = lineOnTail(B, A, DUEL.tailTouch * 1.3);
-        const att = ta && !tb ? d.a : tb && !ta ? d.b : null;
-        if (att) {
-          d.kind = 'rabiola'; d.att = att; d.f = Math.max(.05, (ta || tb).t); d.t = 0; d.prog = 0; d.stretch = 0; d.dg = 0;
-          ev.push({ type: 'duelStart', a: d.a, b: d.b, x: d.x, kind: 'rabiola', att });
-          continue;
-        }
+        // rabiola presa que virou corte: o ponto preso continua na linha de quem prendeu
+        if (d.pr) { const P = d.att === d.a ? A : B; if (P.poly && d.tx) d.tx = pointPoly(d.tx, P.poly).c; }
       }
       d.t += dt;
       d.ha = d.ha || { p: 0, g: 0 }; d.hb = d.hb || { p: 0, g: 0 };
@@ -326,6 +347,13 @@ export class Arena {
         let rt = lineOnTail(A, B, DUEL.tailTouch), att = A;
         if (!rt) { rt = lineOnTail(B, A, DUEL.tailTouch); att = B; }
         if (rt) {
+          const vic = att === A ? B : A;
+          if (fastPull(att) > 0 || (att.ks || 0) > DUEL.cortaRabiola) {
+            // a linha passou rápido: o cerol corta a rabiola ali mesmo e o pedaço cai
+            this.cool.set(key(A.id, B.id), 1.5);
+            ev.push({ type: 'tailCut', a: A.id, b: B.id, att: att.id, vic: vic.id, x: rt.c2, f: Math.max(.05, rt.t), by: att.id });
+            continue;
+          }
           this.duels.push({ a: A.id, b: B.id, prog: 0, t: 0, x: rt.c2, kind: 'rabiola', att: att.id, f: Math.max(.05, rt.t), stretch: 0 });
           ev.push({ type: 'duelStart', a: A.id, b: B.id, x: rt.c2, kind: 'rabiola', att: att.id });
           continue;
@@ -346,9 +374,9 @@ export class Arena {
       h.age += dt;
       const solta = (p, why, by = h.by) => {
         this.hangs.splice(i, 1);
-        this.spawnStray(p, h.kite, h.owner, 8);
-        this.strays[this.strays.length - 1].block = h.by; // quem deixou escapar não apara de volta na hora
-        ev.push({ type: 'hangCut', id: h.id, holder: h.by, by, p: p.slice(), why, kite: h.kite });
+        const ns = this.spawnStray(p, h.kite, h.owner, h.tl || 8);
+        ns.block = h.by; // quem deixou escapar não apara de volta na hora
+        ev.push({ type: 'hangCut', id: h.id, holder: h.by, by, p: p.slice(), why, kite: h.kite, sid: ns.id });
       };
       if (!P || !flying(P) || !P.poly) { solta(h.last || [0, 20, 0], 'perdeu'); continue; }
       const L = Math.max(1, P.s.L || 1);
@@ -377,10 +405,7 @@ export class Arena {
     for (let i = this.strays.length - 1; i >= 0; i--) {
       const s = this.strays[i];
       s.age += dt;
-      const hf = heightWind(s.p[1]);
-      s.p[0] += (W.dx * W.speed * 0.8 * hf + Math.sin(t * 1.3 + s.ph) * 1.6) * dt;
-      s.p[1] -= (1.3 + 0.8 * Math.sin(t * 1.7 + s.ph)) * dt; // cai balançando, ora mais rápido
-      s.p[2] += W.dz * W.speed * 0.8 * hf * dt;
+      strayStep(s, W, t, dt);
       const gy = this.groundAt ? this.groundAt(s.p[0], s.p[2]) : 0; // chão/telhado do cenário
       if (s.p[1] < gy + 0.5 || s.age > 70) { this.strays.splice(i, 1); continue; }
       if (s.tl > 0) strayTrail(s.p, s.tl, W.dx, W.dz, 6, s.trail);
@@ -394,7 +419,7 @@ export class Arena {
           p.score += 50; p.aparadas++;
           ev.push({ type: 'catch', id: s.id, by: p.id, p: s.p.slice(), kite: s.kite, pelaLinha: naLinha });
           this.strays.splice(i, 1);
-          this.hang(p.id, s.kite, pointPoly(s.p, p.poly).u, s.owner, s.p, 'catch', ev);
+          this.hang(p.id, s.kite, pointPoly(s.p, p.poly).u, s.owner, s.p, 'catch', ev, s.tl || 8);
           break;
         }
       }

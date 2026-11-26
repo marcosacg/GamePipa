@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import { toonMat } from './materials.js';
 import { S, G, keys } from './state.js';
 import { MISSIONS, KITES, getPatterns, MAX_LINE, MIN_LINE, G_STRAY, G_GROUND, G_STATIC, H, DISPUTA_WIND } from './config.js';
-import { clamp, lerp, rand, lerpAngle, segDist } from './utils.js';
+import { clamp, lerp, rand, lerpAngle, segDist, noise1 } from './utils.js';
 import { windState } from './shared/wind.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, UP } from './physics.js';
 import { scene, camera, renderer, groundH, trees, SCN, collideWalk } from './scene.js';
-import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail, cutTail, lineControl } from './kite.js';
+import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail, cutTail, lineControl, cortarMinhaLinha } from './kite.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry, lineHand } from './player.js';
 import { RemoteView, StrayView } from './remote.js';
 import { Snd } from './audio.js';
@@ -288,9 +288,22 @@ function lineOf(ss, who, me) {
   };
 }
 
+/**
+ * A linha de quem perdeu corta EXATAMENTE no ponto do cruzamento (e.x): o pedaço da mão até o corte cai
+ * solto, e o pedaço do corte até a pipa vai com ela (avoada ou aparada). Devolve esse pedaço.
+ */
+function cortaLinha(e, me) {
+  if (e.loser === me) return S.state === 'voando' ? cortarMinhaLinha(e.x) : null;
+  const lv = G.remotes.get(e.loser);
+  return lv && !lv.lostHold ? lv.cutLine(e.x) : null;
+}
+/** guarda o pedaço para a avoada/aparada que a arena acabou de criar */
+function guardaPedaco(key, pts) { if (pts) G.pedacos.set(key, pts); }
+
 /* Rabiola presa + linhas encostando: quem teve a rabiola pega perdeu na hora. A pipa dele não vira
    avoada: fica 6 s pendurada pela rabiola na linha de quem ganhou, e só então vem o aviso de "Aparou!". */
 function duelAparada(ss, e, me) {
+  guardaPedaco('h' + e.loser, cortaLinha(e, me)); // a linha dele corta no ponto exato; o pedaço vai com a aparada
   const lv = G.remotes.get(e.loser);
   if (lv) lv.markLost();                       // a pipa dele some do céu (agora está pendurada)
   const won = e.winner === me, lost = e.loser === me;
@@ -309,6 +322,7 @@ function hangView(ss, h, me, e = null) {
   const why = e ? e.why : 'catch';
   const v = startAparada({
     kite: h.kite || { type: 'pipa', pat: 0 }, from: e && e.from ? V3(e.from) : null, f0: h.f,
+    piece: e ? pegaPedaco(why === 'aparada' ? 'h' + e.owner : 'c' + h.by) : null, tl: h.tl || (e && e.tl) || 8,
     line: lineOf(ss, h.by, me), persist: true,
     getF: () => { const x = (ss.hangs || []).find(q => q.id === h.id); return x ? x.f : null; },
     onArrive: p => {
@@ -327,9 +341,10 @@ function hangView(ss, h, me, e = null) {
   });
   G.hangViews.set(h.id, v);
 }
+function pegaPedaco(k) { const p = G.pedacos.get(k); G.pedacos.delete(k); return p || null; }
 function hangEnd(id) { const v = G.hangViews.get(id); if (v) { v.remove(); G.hangViews.delete(id); } }
 /** avoada nova (vem de longe), ou em "at" com a pipa "kite" (aparada que soltou) */
-function spawnStray(at = null, kiteIn = null) {
+function spawnStray(at = null, kiteIn = null, piece = null) {
   const A = PH.A, P = G.player.g.position;
   const side = new THREE.Vector3(-S.windDirH.z, 0, S.windDirH.x);
   const p = at ? at.clone() : new THREE.Vector3().copy(P).addScaledVector(S.windDirH, -55).addScaledVector(side, rand(-22, 22));
@@ -343,7 +358,7 @@ function spawnStray(at = null, kiteIn = null) {
   st.body.setAngularFactor(new A.btVector3(0, 0, 0));
   st.kite = { type, pat };
   st.tl = rand(10, 25); // pedaço de linha que ela vem arrastando
-  st.view = new StrayView(st.kite, st.tl);
+  st.view = new StrayView(st.kite, st.tl, piece);
   if (at) st.noCatch = 3; // a que acabou de soltar não gruda de novo na hora
   S.strays.push(st);
   if (!at) toast('Pipa avoada!', 'Vem vindo do alto, pelas costas. Apare com a linha!', 'good', 2.2);
@@ -359,8 +374,11 @@ export function strayForces() {
     if (st.caught) { _sp.copy(S.kitePos).add(st.offset); setPos(st.body, _sp); setVel(st.body, _sv.set(0, 0, 0)); continue; }
     getPos(st.body, _sp); getVel(st.body, _sv);
     windAt(_sp, _sw);
-    _sf.copy(_sw).multiplyScalar(.85); _sf.y -= .9;
-    _sf.x += Math.sin(S.clock * 1.3 + st.ph) * 1.2;
+    // solta no ar: o vento (com rajadas de lado) arrasta, e a sustentação vai e volta conforme ela rodopia
+    const g2 = noise1(S.clock * 1.3 + st.ph * 5 + 11), g3 = noise1(S.clock * .6 + st.ph * 3 + 29);
+    _sf.copy(_sw).multiplyScalar(.85);
+    _sf.x += -S.windDirH.z * S.windSpeed * .3 * g2; _sf.z += S.windDirH.x * S.windSpeed * .3 * g2;
+    _sf.y -= .9 + 1.2 * g3;
     _sf.sub(_sv).multiplyScalar(.32);
     force(st.body, _sf);
   }
@@ -468,15 +486,15 @@ export function updateLogic(dt) {
     }
     if (pega) {
       // encostou: a avoada gruda na minha linha e fica pendurada 6 s; depois vem o aviso e os pontos
-      const kite = st.kite, from = _tmp.clone();
+      const kite = st.kite, from = _tmp.clone(), piece = st.view.linePts(), tl = st.tl;
       removeStray(st); S.strays.splice(i, 1);
       Snd.beep(660, .12, 'triangle', .15);
       startAparada({
-        kite, from, line: myLine, persist: true,
+        kite, from, line: myLine, persist: true, piece, tl,
         reel: () => !!keys.Space && S.state === 'voando',
         rip: () => (S.pulling && S.stamina > .02 ? Math.max(0, (S.kiteSpeed || 0) - DUEL.rapida) : 0),
         onHome: p => { if (!S.running) return; S.score += 50; burst(p.setY(p.y + 1), '#06d6a0', 'GUARDOU! +50'); toast('Pipa guardada!', 'Trouxe a aparada até a mão · +50', 'good', 2); Snd.ring(1.6); },
-        onCut: p => { if (!S.running) return; burst(p, '#e63946', 'RABIOLA CORTOU!', true); toast('Puxou rápido demais!', 'A rabiola cortou e a aparada saiu avoada: apare de novo!', 'bad', 2.4); spawnStray(p, kite); },
+        onCut: (p, pts) => { if (!S.running) return; burst(p, '#e63946', 'RABIOLA CORTOU!', true); toast('Puxou rápido demais!', 'A rabiola cortou e a aparada saiu avoada: apare de novo!', 'bad', 2.4); spawnStray(p, kite, pts); },
         onArrive: p => {
           if (!S.running) return;
           burst(p.setY(p.y + .8), '#06d6a0', 'APAROU! +150');
@@ -531,10 +549,10 @@ function updateDisputa(dt) {
   const t = ss.time();
   for (const [id, v] of G.remotes) {
     const d = ss.duels.find(x => x.a === id || x.b === id);
-    const victim = d && d.kind === 'rabiola' && d.att !== id;
-    // quem teve a rabiola presa: linha reta, rabiola puxada; os outros: linha dobrada no ponto
+    const victim = d && d.att && d.att !== id && (d.kind === 'rabiola' || d.pr);
+    // linha dobrada no ponto do cruzamento (corte); quem teve a rabiola presa: rabiola puxada até a linha do outro
     v.windSpeed = S.windSpeed;
-    v.update(dt, t, S.windDirH, d && !victim ? _dx.fromArray(d.x).clone() : null, victim ? _dx.fromArray(d.x).clone() : null, d ? (d.f || 0) : 1);
+    v.update(dt, t, S.windDirH, d && d.kind === 'linha' ? _dx.fromArray(d.x).clone() : null, victim ? _dx.fromArray(d.tx || d.x).clone() : null, d ? (d.f || 0) : 1);
   }
 
   // avoadas da arena
@@ -542,7 +560,7 @@ function updateDisputa(dt) {
   for (const s of ss.strays) {
     seen.add(s.id);
     let v = G.strayViews.get(s.id);
-    if (!v) { v = new StrayView(s.kite, s.tl || 0); G.strayViews.set(s.id, v); }
+    if (!v) { v = new StrayView(s.kite, s.tl || 0, G.pedacos.get('s' + s.id)); G.pedacos.delete('s' + s.id); G.strayViews.set(s.id, v); }
     v.set(s.p);
     v.update(dt, t, S.windDirH);
   }
@@ -565,12 +583,15 @@ function updateDisputa(dt) {
 
   // minha enroscada
   const mine = ss.duels.find(x => x.a === ss.myId || x.b === ss.myId);
-  const iAmVictim = mine && mine.kind === 'rabiola' && mine.att !== ss.myId;
-  if (mine && S.state === 'voando' && !iAmVictim) { if (!S.duelX) S.duelX = new THREE.Vector3(); S.duelX.lerp(_dx.fromArray(mine.x), S.duelX.lengthSq() ? .3 : 1); }
+  // presa = a minha rabiola está enroscada na linha dele (mesmo depois que as linhas cruzaram)
+  const preso = mine && mine.att && (mine.kind === 'rabiola' || mine.pr);
+  const iAmVictim = preso && mine.att !== ss.myId;
+  if (mine && S.state === 'voando' && mine.kind === 'linha') { if (!S.duelX) S.duelX = new THREE.Vector3(); S.duelX.lerp(_dx.fromArray(mine.x), S.duelX.lengthSq() ? .3 : 1); }
   else S.duelX = null;
-  if (iAmVictim && S.state === 'voando') { if (!S.tailTug) S.tailTug = new THREE.Vector3().fromArray(mine.x); else S.tailTug.lerp(_dx.fromArray(mine.x), .3); S.tailF = mine.f || 0; }
+  const tug = iAmVictim ? (mine.tx || mine.x) : null;
+  if (tug && S.state === 'voando') { if (!S.tailTug) S.tailTug = new THREE.Vector3().fromArray(tug); else S.tailTug.lerp(_dx.fromArray(tug), .3); S.tailF = mine.f || 0; }
   else S.tailTug = null;
-  S.lineLoad = !!(mine && mine.att === ss.myId && S.state === 'voando');
+  S.lineLoad = !!(preso && mine.att === ss.myId && S.state === 'voando');
 }
 
 function tailColor(kite) {
@@ -596,8 +617,8 @@ function handleEvent(ss, e) {
       if (e.a === me || e.b === me) {
         cam.shake = .35; flashDuel();
         const other = ss.nameOf(e.a === me ? e.b : e.a);
-        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Encoste a sua linha na dele e segure ' + DUEL.dangerTime + ' s para aparar', 'good', 2.6);
-        else if (e.kind === 'rabiola') toast('Sua rabiola prendeu na linha de ' + other + '!', 'Afaste a pipa (A/D) pra escorregar · não deixe as linhas encostarem!', 'bad', 3);
+        if (e.kind === 'rabiola' && e.att === me) toast('Prendeu a rabiola de ' + other + '!', 'Cruze a linha na dele e corte: ela fica pendurada na sua', 'good', 2.6);
+        else if (e.kind === 'rabiola') toast('Sua rabiola enroscou na linha de ' + other + '!', 'Estique/sacuda (A/D) ou dê uma puxada rápida pra cortar a rabiola', 'bad', 3);
         else toast('Enroscou com ' + other + '!', 'W puxa (gasta fôlego) · S dá linha', 'good', 2.4);
         Snd.tangle();
       }
@@ -608,6 +629,11 @@ function handleEvent(ss, e) {
       if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#e63946', 'ARREBENTOU!', true);
       const lp = kitePosOf(ss, e.loser);
       if (lp) burst(lp, '#ffd166', 'AVOADA! Quem aparar leva');
+      const pedaco = cortaLinha(e, me);
+      if (e.sid != null && pedaco) {
+        const sv = G.strayViews.get(e.sid);
+        if (sv) sv.setCut(pedaco); else guardaPedaco('s' + e.sid, pedaco);
+      }
       const lv = G.remotes.get(e.loser);
       if (lv) lv.markLost(); // na tela de todo mundo a pipa dele some e ele fica bravo na hora
       if (e.winner === me || e.loser === me) cam.shake = .5;
@@ -618,15 +644,6 @@ function handleEvent(ss, e) {
       } else toast(ss.nameOf(e.winner) + ' cortou ' + ss.nameOf(e.loser), '', '', 1.6);
       break;
     }
-    case 'danger':
-      if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#e63946', 'LINHAS ENCOSTARAM! ' + DUEL.dangerTime + ' s', true);
-      if (e.vic === me) { cam.shake = .4; flashDuel(); Snd.tangle(); toast('PERIGO! ' + DUEL.dangerTime + ' s pra escapar', 'Afaste a sua linha da dele (A/D) e sacuda a rabiola', 'bad', 3); }
-      else if (e.att === me) { flashDuel(); toast('Linhas encostadas!', 'Segure ' + DUEL.dangerTime + ' s encostado para aparar a pipa de ' + ss.nameOf(e.vic), 'good', 3); }
-      break;
-    case 'dangerOff':
-      if (e.vic === me) { toast('Afastou as linhas!', 'A rabiola ainda está presa: estique e sacuda', 'good', 2); Snd.ring(.8); }
-      else if (e.att === me) toast(ss.nameOf(e.vic) + ' afastou a linha', 'Encoste de novo para recomeçar a contagem', '', 2);
-      break;
     case 'tailFree':
       if (e.vic === me) { toast('A rabiola escorregou e soltou!', 'Escapou dessa', 'good', 2); Snd.ring(.8); }
       else if (e.att === me) toast('A rabiola de ' + ss.nameOf(e.vic) + ' escapou', '', '', 1.8);
@@ -638,13 +655,14 @@ function handleEvent(ss, e) {
       // a avoada gruda na linha de quem aparou e fica pendurada 6 s; depois vem o aviso
       const sv = G.strayViews.get(e.id);
       const kite = e.kite || (sv && sv.kite) || { type: 'pipa', pat: 0 };
-      if (sv) { sv.dispose(); G.strayViews.delete(e.id); }
+      if (sv) { guardaPedaco('c' + e.by, sv.linePts()); sv.dispose(); G.strayViews.delete(e.id); }
       if (e.by === me) Snd.beep(660, .12, 'triangle', .15);
       G.lastCatch = e; // o 'hang' que vem logo depois usa (pegou pela linha?)
       break;
     }
     case 'hang': hangView(ss, e, me, { ...e, pelaLinha: G.lastCatch && G.lastCatch.by === e.by && G.lastCatch.pelaLinha }); break;
     case 'hangCut': {
+      { const hv = G.hangViews.get(e.id); if (hv && e.sid != null) guardaPedaco('s' + e.sid, hv.linePts()); } // a linha dela continua igual
       hangEnd(e.id);
       const p = V3(e.p);
       if (e.why === 'puxada') {

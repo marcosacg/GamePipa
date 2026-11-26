@@ -6,16 +6,18 @@
 import * as THREE from 'three';
 import { noOutline } from './materials.js';
 import { KITES } from './config.js';
-import { scene } from './scene.js';
+import { scene, groundH } from './scene.js';
 import { makeKiteMesh, TailRenderer, proceduralTail } from './kite.js';
+import { TailSim } from './rabiola.js';
+import { LinhaSolta, CorpoSolto } from './linhasolta.js';
 
 const SEG = .38;         // distância entre os laços da rabiola (m)
-const DANGLE = 7;        // linha solta da avoada, pendurada no bico (m); os fios embolados caem do gancho
-const STRANDS = 3;
+const DANGLE = 8;        // linha solta da avoada (m), quando não se sabe o pedaço exato do corte
+const VENTO = 6;          // vento sentido pela pipa pendurada (m/s)
 const TOLERA = 2;        // quanto tempo a aparada espera a linha de quem aparou voltar antes de cair (s)
 const GRUDA = .8;        // tempo grudando/balançando antes de começar a escorregar (s)
 export const DURACAO = 6; // segundos pendurada na linha até o aviso de "Aparou!"
-const ND = 26, NC = 28;  // pontos da linha pendurada e da voltinha enrolada
+const ND = 30, NC = 28;  // trechos da linha pendurada e pontos da voltinha enrolada
 
 const list = [];
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _t = new THREE.Vector3(), _s = new THREE.Vector3(),
@@ -53,7 +55,7 @@ class Hanging {
    * persist: continua pendurada depois do "Aparou!" · getF(): onde ela está na linha (arena), ou null
    * reel(): recolhendo (Espaço) · rip(): puxada rápida agora (quanto passou do limite) · onHome / onCut
    */
-  constructor({ kite, from, line, onArrive, onDrop, persist = false, getF = null, reel = null, rip = null, onHome = null, onCut = null, f0 = null }) {
+  constructor({ kite, from, line, onArrive, onDrop, persist = false, getF = null, reel = null, rip = null, onHome = null, onCut = null, f0 = null, piece = null, tl = DANGLE }) {
     if (!from) { const l0 = line(); from = l0 && f0 != null ? lineAt(l0, f0, new THREE.Vector3()) : new THREE.Vector3(0, 20, 0); }
     const type = KITES[kite.type] ? kite.type : 'pipa', pat = kite.pat || 0;
     this.getLine = line; this.onArrive = onArrive; this.onDrop = onDrop;
@@ -64,17 +66,22 @@ class Hanging {
     this.hang = this.up * SEG;                    // comprimento da rabiola que segura a pipa
     this.tail = new TailRenderer(type, pat, this.n); this.tailPts = [];
     for (let i = 0; i <= this.n; i++) this.tailPts.push(new THREE.Vector3().copy(from));
-    this.rope = makeLineObj(ND + 1, 0xeeeeee);   // a linha da avoada, solta, pendurada no bico
-    this.strands = [];                            // fios soltos/embolados que caem junto
-    for (let k = 1; k < STRANDS; k++) this.strands.push({ l: makeLineObj(ND + 1, k === 1 ? 0xdddddd : 0xf4f4f4), pts: [], len: .55 + Math.random() * .35, ph: Math.random() * 10 });
-    for (const st of this.strands) { scene.add(st.l); for (let i = 0; i <= ND; i++) st.pts.push(new THREE.Vector3().copy(from)); }
+    this.rope = makeLineObj(ND + 1, 0xeeeeee);   // a linha da avoada (o pedaço do corte), solta, presa na pipa
+    this.strands = [];
+    // rabiola, pipa e linha solta: tudo com física (nada de animação pronta)
+    this.tsim = new TailSim(this.n, this.ph = Math.random() * 10, SEG);
+    this.piece = piece; this.tlen = Math.max(2, Math.min(60, tl || DANGLE)); this.rsim = null;
+    const ud = this.mesh.userData;
+    this.corpo = new CorpoSolto(Math.max(.25, ((ud.top || .5) - (ud.bottom || -.5)) * .45), this.ph);
+    this.corpo.ax.set(0, -1, 0);                  // pendurada pela rabiola: começa de cabeça pra baixo
     this.coilL = makeLineObj(NC, 0xeeeeee);      // voltinha enrolada na linha de quem aparou
     scene.add(this.mesh, this.rope, this.coilL);
     this.pos = new THREE.Vector3().copy(from); this.vel = new THREE.Vector3();
     this.hook = new THREE.Vector3();
     const l = line();
     this.f = f0 != null ? f0 : l ? nearestF(l, from) : .5;
-    this.t = 0; this.v = 0; this.ph = Math.random() * 10; this.dropped = false; this.done = false;
+    if (l) { lineAt(l, this.f, this.hook); _d.subVectors(this.pos, this.hook); const dl = _d.length(); if (dl > this.hang) this.pos.copy(this.hook).addScaledVector(_d, this.hang / dl); }
+    this.t = 0; this.v = 0; this.dropped = false; this.done = false;
     this.side = Math.random() < .5 ? 1 : -1;
     this.dangle = []; for (let i = 0; i <= ND; i++) this.dangle.push(new THREE.Vector3().copy(from));
   }
@@ -87,6 +94,7 @@ class Hanging {
     // a linha pode "sumir" por um instante (travadinha na conexão de quem aparou): só cai se sumir de verdade
     this.semLinha = line ? 0 : (this.semLinha || 0) + dt;
     if (!this.dropped && !line && this.semLinha > TOLERA) this.drop();
+    this._dt = dt;
     if (this.dropped) return this.fall(dt, t, windDirH);
 
     // escorrega pela linha até a mão (devagar no começo, depois mais rápido)
@@ -113,17 +121,16 @@ class Hanging {
     if (this.rip && this.t > 1.5) {
       const r = this.rip();
       this.rp = r > 0 ? this.rp + r * .55 * dt : Math.max(0, this.rp - dt);
-      if (this.rp >= 1) { const p = this.hook.clone(); this.dispose(); if (this.onCut) this.onCut(p); return false; }
+      if (this.rp >= 1) { const p = this.hook.clone(), pts = this.linePts(); this.dispose(); if (this.onCut) this.onCut(p, pts); return false; }
     }
 
-    // pipa pendurada: ponto com massa preso no gancho por um pedaço de linha (balança sozinha)
-    _w.copy(windDirH).multiplyScalar(4.5);
-    _a.set(0, -3.4, 0).addScaledVector(_w.sub(this.vel), .9);
-    _a.x += Math.sin(t * 2.3 + this.ph) * 1.2; _a.z += Math.cos(t * 1.9 + this.ph) * .8;
+    // pipa pendurada: só física — peso, vento no pano (arrasto) e a rabiola segurando no gancho
+    _w.copy(windDirH).multiplyScalar(VENTO);
+    _a.set(0, -9.81 * .55, 0).addScaledVector(_w.sub(this.vel), 1.1);
     this.vel.addScaledVector(_a, dt);
     this.pos.addScaledVector(this.vel, dt);
     _d.subVectors(this.pos, this.hook);
-    const dl = _d.length(), rope = this.t < GRUDA ? this.hang + (1 - this.t / GRUDA) * 1.2 : this.hang;
+    const dl = _d.length(), rope = this.hang;
     if (dl > rope) {
       _d.multiplyScalar(1 / dl);
       this.pos.copy(this.hook).addScaledVector(_d, rope);
@@ -146,69 +153,39 @@ class Hanging {
     return true;
   }
 
-  /** nose = para onde aponta o bico; hanging = pendurada pela rabiola (a ponta de cima da rabiola fica no gancho) */
-  pose(t, windDirH, nose, hanging) {
-    const ud = this.mesh.userData;
-    // this.pos é onde a rabiola sai da pipa; o centro da pipa fica do outro lado
-    this.mesh.position.copy(this.pos).addScaledVector(nose, -(ud.bottom || -.5) * .9);
-    this.mesh.up.copy(nose);
-    this.mesh.lookAt(_n.copy(this.mesh.position).addScaledVector(windDirH, -5));
-    this.mesh.rotateZ(Math.sin(t * 3.1 + this.ph) * .25);
-    if (!hanging) {
-      _n.set(0, ud.bottom * .9, 0).applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
-      this.tail.update(proceduralTail(this.tailPts, _n, windDirH, this.n, t, this.ph), t, windDirH);
-      return;
-    }
-    // rabiola: da pipa até o gancho (esticada, com o peso da pipa) e o resto caindo do outro lado da linha
-    const P = this.tailPts, up = this.up;
-    for (let i = 0; i <= this.n; i++) {
-      if (i <= up) {
-        const s = i / up;
-        _a.lerpVectors(this.pos, this.hook, s);
-        _a.addScaledVector(windDirH, Math.sin(s * Math.PI) * .18).y -= Math.sin(s * Math.PI) * .08;
-      } else {
-        const k = i - up, len = k * SEG;
-        _a.copy(this.hook).addScaledVector(this.other, .18 + k * .03).addScaledVector(_up, -len)
-          .addScaledVector(windDirH, len * .35 + len * len * .03)
-          .add(_b.set(Math.sin(t * 3 + k * .8 + this.ph) * .07 * k, 0, Math.cos(t * 2.5 + k * .7 + this.ph) * .06 * k));
-      }
-      P[i].lerp(_a, i === 0 || i === up ? 1 : .35);
-    }
-    this.tail.update(P, t, windDirH);
+  /**
+   * A pipa é uma vareta física (pé pesado, pano pegando vento). Pendurada: o pé fica onde a rabiola segura
+   * (this.pos) e ela vira de cabeça pra baixo sozinha pelo peso; caindo: gira em volta do centro.
+   */
+  pose(t, windDirH, _unused, hanging) {
+    const dt = this._dt || .016;
+    this.corpo.update(dt, this.pos, windDirH, VENTO, t, hanging);
+    this.corpo.apply(this.mesh, windDirH);
+    // rabiola com física: sai do pé da pipa, presa no gancho (laço "up") e o resto pendura do outro lado
+    const pin = hanging ? (this._pin = this._pin || { i: this.up, p: new THREE.Vector3() }) : null;
+    if (pin) pin.p.copy(this.hook);
+    this.tail.update(this.tsim.update(dt, this.corpo.bot, windDirH, VENTO, t, pin), t, windDirH);
   }
 
-  /** a linha da avoada, solta, pendurada no bico; e uns fios embolados caindo do gancho */
+  /** a linha da avoada (o pedaço exato do corte), solta, presa na pipa: física de fio com peso e vento */
   drawRope(t, windDirH) {
-    const p = this.rope.geometry.attributes.position, ud = this.mesh.userData;
-    _n.set(0, ud.top || .5, 0).applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
-    for (let i = 0; i <= ND; i++) {
-      const s = i / ND, len = DANGLE * s;
-      const target = _a.copy(_n).addScaledVector(_up, -len).addScaledVector(windDirH, len * len * .05)
-        .add(_b.set(Math.sin(t * 2.6 + s * 5 + this.ph) * .35 * s, 0, Math.cos(t * 2.2 + s * 4 + this.ph) * .3 * s));
-      this.dangle[i].lerp(target, i === 0 ? 1 : .25); // segue com atraso: parece corda de verdade
-      p.setXYZ(i, this.dangle[i].x, this.dangle[i].y, this.dangle[i].z);
+    const c = this.mesh.position;
+    if (!this.rsim) {
+      const pts = this.piece && this.piece.length > 1 ? this.piece : [c.clone(), c.clone().addScaledVector(windDirH, -this.tlen * .4).add(new THREE.Vector3(0, -this.tlen * .9, 0))];
+      this.rsim = new LinhaSolta(pts, ND, { chao: groundH });
     }
-    p.needsUpdate = true;
-    for (const st of this.strands) {
-      const sp = st.l.geometry.attributes.position;
-      for (let i = 0; i <= ND; i++) {
-        const s = i / ND, len = 9 * st.len * s;
-        const target = _a.copy(this.hook).addScaledVector(this.other, (.1 + .4 * st.len) * Math.min(1, s * 3))
-          .addScaledVector(_up, -len).addScaledVector(windDirH, len * len * .06)
-          .add(_b.set(Math.sin(t * 3.1 + s * 7 + st.ph) * .45 * s, Math.sin(s * 19 + st.ph) * .08, Math.cos(t * 2.7 + s * 6 + st.ph) * .4 * s));
-        st.pts[i].lerp(target, i === 0 ? 1 : .2);
-        sp.setXYZ(i, st.pts[i].x, st.pts[i].y, st.pts[i].z);
-      }
-      sp.needsUpdate = true;
-    }
+    this.rsim.update(this._dt || .016, c, windDirH, VENTO, t);
+    this.rsim.write(this.rope.geometry.attributes.position, 0);
   }
+  /** pontos atuais da linha solta dela (passa adiante se ela soltar e virar avoada) */
+  linePts() { return this.rsim ? this.rsim.toArray() : null; }
 
   /** duas voltinhas da linha da avoada em volta da linha de quem aparou */
   drawCoil(t, tan) {
     const p = this.coilL.geometry.attributes.position;
     _s.crossVectors(tan, _up).normalize(); _n.crossVectors(_s, tan).normalize();
     for (let i = 0; i < NC; i++) {
-      const s = i / (NC - 1), a = s * Math.PI * 4 + t * .5, r = .09;
+      const s = i / (NC - 1), a = s * Math.PI * 4, r = .09; // voltinhas paradas em volta da linha
       _a.copy(this.hook).addScaledVector(tan, (s - .5) * .45).addScaledVector(_s, Math.cos(a) * r).addScaledVector(_n, Math.sin(a) * r);
       p.setXYZ(i, _a.x, _a.y, _a.z);
     }
@@ -232,12 +209,17 @@ class Hanging {
     this.coilL.visible = false;
     if (this.onDrop) this.onDrop();
   }
+  /** caindo de verdade: peso, vento e a linha dela arrastando, até o chão (e fica um pouco lá) */
   fall(dt, t, windDirH) {
-    this.vel.y -= 4 * dt; this.vel.addScaledVector(_w.copy(windDirH).multiplyScalar(3).sub(this.vel), .6 * dt);
-    this.pos.addScaledVector(this.vel, dt);
+    this._dt = dt;
+    const gy = groundH(this.pos.x, this.pos.z) + .3;
+    if (this.pos.y > gy) {
+      this.vel.y -= 9.81 * .55 * dt; this.vel.addScaledVector(_w.copy(windDirH).multiplyScalar(VENTO).sub(this.vel), 1.1 * dt);
+      this.pos.addScaledVector(this.vel, dt);
+    } else { this.pos.y = gy; this.vel.set(0, 0, 0); this.noChao = (this.noChao || 0) + dt; }
     this.pose(t, windDirH, _up, false);
-    this.rope.visible = false; for (const st of this.strands) st.l.visible = false;
-    if (this.t > 2.2) { this.dispose(); return false; }
+    this.drawRope(t, windDirH);
+    if (this.noChao > 4 || this.t > 25) { this.dispose(); return false; }
     return true;
   }
   dispose() {

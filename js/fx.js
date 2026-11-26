@@ -1,6 +1,7 @@
 // Efeitos visuais: estouro (enroscada, linha arrebentando, aparada) e a rabiola enrolada/pendurada na linha.
 // Tudo cresce com a distância da câmera, para dar para ver lá no alto.
 import * as THREE from 'three';
+import { S } from './state.js';
 import { scene, camera, makeLabel } from './scene.js';
 
 const triGeo = new THREE.BufferGeometry();
@@ -19,6 +20,7 @@ function distScale(pos, ref = 14, max = 5) { return clamp(camera.position.distan
 
 /** estouro de partículas + anel + texto subindo */
 export function burst(pos, color = '#ffd166', text = null, big = false) {
+  if (S.limpa && S.running) return; // tela limpa: sem estouros nem letreiros (o corte se vê na linha e na pipa)
   const g = new THREE.Group();
   g.position.copy(pos);
   g.scale.setScalar(distScale(pos) * (big ? 1.3 : 1));

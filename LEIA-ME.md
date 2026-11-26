@@ -15,6 +15,10 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 
 ## Câmeras e linha
 
+- **Tela limpa** (padrão): durante o jogo não aparece painel nem aviso (altura, vento, missão, "pipa avoada", "cruzou"...).
+  Fica só o contador de cortes (na disputa), a mira na primeira pessoa e os botões do celular. A linha fica **vermelha piscando**
+  quando está perto de arrebentar. Tecla **I** (ou o botão **ⓘ** no celular) mostra/esconde as informações; o jogo lembra a escolha.
+
 - **Três câmeras** (tecla **C**, ou o botão **🎥 câmera** no celular; o jogo lembra a última escolhida):
   - **Atrás do boneco**: a de sempre.
   - **No ombro**: atrás da cabeça, olhando para o alto (como filmar alguém soltando pipa).
@@ -23,7 +27,8 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   - Nas duas câmeras novas a visão acompanha a pipa sozinha. **Arraste** para olhar em volta (depois de um instante ela
     volta para a pipa). **Z**, a roda do mouse ou o botão **🔍** dão zoom. Na primeira pessoa há uma mira no meio da tela.
 - **Linha de até 300 m**. Ela tem **barriga**: cai no meio e o vento empurra; com folga cai bem mais e fica balançando.
-  O desenho é uma corda simulada (`js/corda.js`) que segue o mesmo formato que a disputa usa (`js/shared/linha.js`):
+  O desenho é uma corda com física (`js/corda.js`): peso, vento empurrando de lado (como num fio), rajadas que correm pela
+  linha e comprimento que não estica. Uma mola bem fraca a mantém perto do formato que a disputa usa (`js/shared/linha.js`):
   a enroscada, a rabiola presa e o aparar contam com a linha curvada, do jeito que aparece na tela.
 - Quando a pipa fica tão longe que vira um pontinho, um **círculo amarelo** marca onde ela está (vermelho se a linha estiver no limite).
 - **Puxa e descarrega** (para subir rápido): as puxadas (**W**) enchem a **carga** (barra azul embaixo da tensão);
@@ -31,6 +36,18 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   No ritmo puxa ~1 s / solta ~1 s ela sobe de 1,5 a 3 vezes mais rápido do que só dando linha. Os números ficam em `CARGA`,
   no começo de `js/kite.js`.
 - **Vento por altura**: lá em cima venta mais (até 18% a mais acima de 140 m) e com rajadas próprias.
+- **Rabiola com física**: todas as rabiolas (a sua, dos bots, dos outros jogadores online, das avoadas e das pipas caindo)
+  são correntes de laços com peso, arrastadas pelo vento e com **tremido** que corre do pé até a ponta, como fita de verdade.
+  Ela segue a pipa com atraso: chicoteia nas cabeçadas e fica pra trás quando a pipa corre (`js/rabiola.js`, números em `RABIOLA`).
+- **Corte no ponto exato**: quando a linha é cortada, ela parte **exatamente no ponto onde a outra linha passou**.
+  O pedaço da mão até o corte cai solto com física (peso, vento de lado, encosta no chão, dobra e embola; o dono vai
+  recolhendo), e o pedaço do corte até a pipa vai junto com ela, no formato que tinha na hora (`js/linhasolta.js`).
+  O comprimento desse pedaço é medido ao longo da linha (com barriga), e é ele que dá pra aparar.
+- **Avoada com física**: a pipa cortada sai com a velocidade que tinha, depois vai com o vento (que muda com a altura e
+  tem rajadas de lado); a sustentação vai e volta conforme ela rodopia, e o pedaço de linha pesa. A pipa em si é uma
+  vareta com o pé pesado (rabiola) e o pano pegando vento: tomba, gira e rodopia sozinha, sem balanço pronto.
+- **Física da pipa**: ela "deita" (inclina) nas curvas, treme com o vento no pano, gira solta quando a linha está frouxa,
+  e o peso da própria linha (0,4 g por metro) puxa pra baixo: com muita linha ela fica um pouco mais baixa.
 - **Voo rápido e solto** (como pipa de combate): a embicada (A/D) é mais ágil e, com a linha frouxa, a pipa gira quase no
   lugar; esticada, ela segue pra onde o bico aponta. A **puxada** (W) dá um tiro na direção do bico. Os números ficam em
   `FLY` no começo de `js/kite.js` (lift, dart = tiro da puxada, side = freio de lado).
@@ -100,35 +117,30 @@ No **online**, vale o cenário de quem **criou** a sala: quem entra com código 
 
 ### Disputa (bots e online)
 
-- **Cruzou, cortou:** cruze a sua linha na linha de outro jogador. A partir daí quem estiver **mexendo a linha** corta a do outro
-  em 1 a 2 segundos; quem fica parado é cortado. O que conta:
+- **Cruzou, cortou (como cerol):** cruzou a sua linha na de outro jogador, quem passar a linha **mais rápido** no cruzamento
+  corta a do outro em fração de segundo (puxada contra quem está parado: ~0,3 a 0,5 s). O que conta:
   - **W** puxada: o golpe mais forte (gasta fôlego).
-  - **S** relo (dar linha): quase tão forte.
-  - **Manobra:** passar a pipa rápido pela linha do outro também corta (quanto mais rápida, mais conta).
-  - **Alterne:** segurar a mesma tecla rende 100% por 1,5 segundo e depois vai perdendo força (até 35%).
-  - Os dois parados: depois de 8 segundos as linhas desenroscam. Linha muito comprida responde mais devagar.
+  - **Pipa correndo:** a velocidade da pipa no cruzamento soma (pipa rápida + puxada corta quase na hora).
+  - **S** relo (dar linha): corta, mas menos que a puxada.
+  - Segurar a mesma tecla perde um pouco de força depois de 2 s (até 60%).
+  - Os dois parados: depois de 5 segundos as linhas desenroscam. Os bots reagem ao cruzamento em 0,1 a 0,4 s.
 - **Contador de cortes:** embaixo, no meio, conta as pipas que você cortou seguidas. A partir de 5 ele pega fogo.
   Zera quando você perde a pipa.
-- **Rabiola presa:** se a sua linha passar na rabiola do outro, a rabiola dele fica presa na sua linha,
-  mas **ninguém perde só por isso**:
-  - Se a **linha** de quem prendeu **encostar na linha** do outro, começa uma **contagem de 1 segundo** (PERIGO).
-    Se as linhas ficarem encostadas até o fim, quem teve a rabiola presa perde: a pipa dele fica **pendurada pela rabiola**
-    na linha de quem ganhou, e aos 6 segundos vem o "Aparou!" (+100 da laçada +50 da aparada). Ela **continua pendurada**
-    (veja "Pipa aparada" abaixo).
-    Para escapar, **afaste a sua linha da dele** (a contagem volta) e estique/sacuda a rabiola até soltar; com as linhas
-    encostadas a rabiola escorrega bem menos. Vale também no meio de uma enroscada de linha: se uma linha pegar a rabiola
-    da outra, vira rabiola presa e a contagem começa.
-  - Quem foi preso **afasta a pipa da linha do outro** (A/D). A rabiola estica e vai **escorregando** até soltar pela ponta.
-    Sacudir ajuda. Depois de 25 s ela solta sozinha.
-  - **A linha corta a rabiola:** uma **puxada rápida** (W com a pipa correndo a mais de 7 m/s) de qualquer um dos dois corta a
-    rabiola no ponto preso. Quem estava preso escapa, mas fica com a rabiola curta e a pipa mais instável até a próxima pipa;
-    o pedaço cortado cai rodopiando.
+- **Linha na rabiola (cerol):**
+  - Passou a linha **rápido** na rabiola de outra pipa (pipa correndo a mais de 9 m/s, ou puxada rápida): o cerol **corta a
+    rabiola** ali mesmo. A pipa dele fica com a rabiola curta (mais instável até a próxima) e o pedaço cai.
+  - Passou **devagar**: a rabiola **enrosca** na sua linha e a pipa dele é arrastada (física). Ele escapa esticando ou
+    sacudindo (A/D) até a rabiola escorregar pela ponta, ou com uma **puxada rápida** que corta a própria rabiola.
+  - Rabiola enroscada e as **linhas se cruzaram**: vira corte normal (cerol, sem contagem). Se a pipa presa for cortada, ela
+    **fica pendurada pela rabiola** na linha de quem cortou (aparada). Se quem prendeu for cortado, a outra escapa.
 - **Pipa nas costas:** você começa (e volta depois de perder) com a pipa nas costas. Ande à vontade e aperte **E** para soltar.
   **R** guarda a pipa nas costas.
 - **Resultado:** quem perde tem a linha arrebentada e a pipa vira **avoada** (marcada no céu). Qualquer jogador,
   inclusive o dono depois que soltar outra, pode **aparar** encostando a linha nela.
   Quando apara, a rabiola da avoada enrosca na sua linha e ela fica pendurada (todo mundo vê); aos 6 s vem o "Aparou!".
-- **Pipa aparada (não some):** continua pendurada pela rabiola e vai escorregando até a sua mão (0,5 m/s; segurando
+- **Pipa aparada (não some):** tudo com física, sem animação pronta: a pipa é uma vareta que vira de cabeça pra baixo
+  pelo próprio peso, pendurada pela rabiola (corrente de laços) presa na sua linha; o vento empurra o pano, e o pedaço de
+  linha dela (o do corte, com o comprimento certo) fica solto, pendurado. Se ela soltar, cai de verdade até o chão. Continua pendurada pela rabiola e vai escorregando até a sua mão (0,5 m/s; segurando
   **Espaço** ela vem a 3 m/s). Chegou na mão: **guardada**, +50. Mas:
   - **Puxada rápida** (W com a pipa correndo) corta a rabiola dela e ela sai **avoada** de novo. Vale pra você, bots e online.
   - A **linha de outro jogador** encostando na pipa pendurada também corta a rabiola: ela sai avoada e quem estiver perto apara.
@@ -211,7 +223,9 @@ js/kite.js            formatos/estampas das pipas, rabiola e física da pipa do 
 js/player.js          personagem estilizado (cabelos, bonés, camisas) e poses
 js/boneco.js          boneco personalizável com esqueleto (pele, cabelo, chapéu, camisa, bermuda/calça)
 js/maos.js            câmeras novas (primeira pessoa e ombro), mãos com carretel, mira e marcador da pipa
+js/rabiola.js         rabiola com física (laços com peso, vento e tremido)
 js/corda.js           linha desenhada como corda (barriga, tremido, folga)
+js/linhasolta.js      linha cortada solta e pipa solta (avoada/aparada) com física
 js/shared/linha.js    formato da linha e vento por altura (igual no servidor e no navegador)
 js/dog.js             cachorro figurante (shiba) que acompanha o jogador
 js/anime.js           personagens prontos (Anime, Menino de boné, Zepeto e Garoto): carrega os modelos, materiais, e anima os ossos por código

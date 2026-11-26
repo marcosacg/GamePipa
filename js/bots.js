@@ -123,6 +123,8 @@ class Bot {
     this.te = this.n > 0 ? tailEndFromWind(this.k, W, this.n) : null;
 
     // tática no corte: puxadas e relos em rajadas, administrando o fôlego
+    if (duel && !this.wasDuel) this.pullT = rnd(.08, .4); // reage ao cruzamento (tempo de reflexo)
+    this.wasDuel = !!duel;
     if (duel) {
       this.pullT -= dt;
       if (this.pullT <= 0) {

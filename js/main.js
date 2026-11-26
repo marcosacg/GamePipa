@@ -5,7 +5,7 @@ import { PH, initPhysics } from './physics.js';
 import { renderer, scene, camera, updateSky, followCamera, SCN, groundH } from './scene.js';
 import { buildWorld, updateEnvironment, setScenario, currentScenario, SCENE_LIST, lastBuild } from './world.js';
 import { buildKite, resetKite, kitePhysicsStep, syncKiteVisual, updateMyLine, lastApparent, putOnBack, launchKite } from './kite.js';
-import { updateHUD, $, toast } from './hud.js';
+import { updateHUD, $, toast, toggleLimpa } from './hud.js';
 import { fp, cycleCamera, CAM_NAMES } from './maos.js';
 import { buildMenu, enablePlay, setNetMsg, showScene } from './menu.js';
 import { Snd } from './audio.js';
@@ -107,6 +107,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH') $('help').classList.toggle('hidden');
   if (e.code === 'KeyC' && S.running && !e.repeat) { const m = cycleCamera(); toast(CAM_NAMES[m], m === 'terceira' ? '' : 'Arraste para olhar em volta · roda do mouse ou Z: zoom', '', 1.6); }
   if (e.code === 'KeyZ' && S.running && !e.repeat) fp.zoom = !fp.zoom;
+  if (e.code === 'KeyI' && !e.repeat) toggleLimpa(); // tela limpa / informações
   if (e.code === 'KeyT') advanceClockKey();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });

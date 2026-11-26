@@ -292,7 +292,7 @@ setInterval(() => {
       }),
       s: room.arena.strays.map(s => ({ id: s.id, p: s.p.map(r2), kite: s.kite, tl: Math.round(s.tl || 0) })),
       hg: room.arena.hangs.map(h => ({ id: h.id, by: h.by, f: Math.round(h.f * 1000) / 1000, kite: h.kite })),
-      d: room.arena.duels.map(d => ({ a: d.a, b: d.b, prog: r2(d.prog), x: d.x.map(r2), kind: d.kind, att: d.att, f: r2(d.f || 0), st: r2(d.stretch || 0), dg: r2(d.dg || 0) })),
+      d: room.arena.duels.map(d => ({ a: d.a, b: d.b, prog: r2(d.prog), x: d.x.map(r2), kind: d.kind, att: d.att, f: r2(d.f || 0), st: r2(d.stretch || 0), pr: d.pr ? 1 : 0, tx: d.tx ? d.tx.map(r2) : null })),
     };
     if (room.scoreTimer <= 0) { snap.sc = room.arena.scores(); room.scoreTimer = 1; }
     room.broadcast(snap);
