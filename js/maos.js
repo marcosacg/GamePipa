@@ -248,6 +248,6 @@ export function updateCamHud() {
     const vis = _pr.z < 1 && Math.abs(_pr.x) < 1.05 && Math.abs(_pr.y) < 1.05;
     mark.style.display = vis ? 'block' : 'none';
     if (vis) mark.style.transform = `translate(${((_pr.x + 1) / 2 * innerWidth).toFixed(1)}px, ${((1 - _pr.y) / 2 * innerHeight).toFixed(1)}px)`;
-    mark.classList.toggle('perigo', isFail(S.state) || S.overT > .2);
+    mark.classList.toggle('perigo', isFail(S.state));
   } else mark.style.display = 'none';
 }

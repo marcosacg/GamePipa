@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { sagOf } from './shared/linha.js';
 import { noise1 } from './shared/wind.js';
 
-const ARRASTO = 1.1, PESO = 6.5, GUIA = 2.8; // vento no fio · peso da linha · mola até o formato oficial
+const ARRASTO = 1.1, PESO = 5, GUIA = 6; // vento no fio · peso da linha · mola até o formato oficial (linha bem esticada)
 const _tg = new THREE.Vector3(), _acc = new THREE.Vector3();
 const _ab = new THREE.Vector3(), _side = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _t = new THREE.Vector3(), _d = new THREE.Vector3();
 
@@ -71,20 +71,23 @@ export class Corda {
     const Lr = dist + (dist > .5 ? 8 * sag * sag / (3 * dist) : 0);       // comprimento da linha entre a mão e a pipa
     const segMax = Lr / n * 1.01 + .002;
     const steps = dt > .02 ? 3 : 2, h = Math.min(dt, .05) / steps;
-    const gust = (.18 + .05 * windSpeed) * (o.giving ? 1.4 : 1);           // rajadinhas que correm pela linha
+    const gust = (.12 + .035 * windSpeed) * (o.giving ? 2.2 : 1);          // rajadinhas que correm pela linha (esticada quase não balança)
+    // linha esticada (sem folga): a pipa puxa forte e a linha fica reta, firme no formato; com folga ela fica solta
+    const taut = Math.max(0, Math.min(1, 1 - slack / (1 + dist * .03)));
+    const guia = GUIA + 34 * taut, arr = ARRASTO * (1 - .6 * taut), peso = PESO * (1 - .5 * taut);
     for (let st = 0; st < steps; st++) {
       P[0].copy(a); P[n].copy(b);
       for (let i = 1; i < n; i++) {
         const s = i / n;
         // vento no ponto (com rajadas que andam pela linha) menos a velocidade dele = vento que ele sente
-        const w1 = noise1(t * 1.3 - s * 4 + this.seed), w2 = noise1(t * 1.7 - s * 5 + this.seed + 31);
+        const m = s * Lr, w1 = noise1(t * 1.3 - m * .07 - s * 2 + this.seed), w2 = noise1(t * 1.7 - m * .1 - s * 2 + this.seed + 31);
         _d.copy(windDirH).multiplyScalar(windSpeed * (1 + .35 * w1)).addScaledVector(_side, w2 * gust * windSpeed).addScaledVector(_up, w1 * gust * 2).sub(V[i]);
         _tg.subVectors(P[i + 1], P[i - 1]); const tl = _tg.length() || 1; _tg.multiplyScalar(1 / tl);
         _d.addScaledVector(_tg, -_d.dot(_tg));                              // fio: o vento só empurra de lado
-        _acc.copy(_d).multiplyScalar(ARRASTO);
-        _acc.y -= PESO;                                                     // peso da linha
-        _acc.addScaledVector(_t.subVectors(T[i], P[i]), ip === i ? 400 : GUIA); // mola fraca até o formato oficial
-        V[i].addScaledVector(_acc, h).multiplyScalar(Math.exp(-1.5 * h));
+        _acc.copy(_d).multiplyScalar(arr);
+        _acc.y -= peso;                                                     // peso da linha
+        _acc.addScaledVector(_t.subVectors(T[i], P[i]), ip === i ? 400 : guia); // mola até o formato oficial (forte quando esticada)
+        V[i].addScaledVector(_acc, h).multiplyScalar(Math.exp(-(1.5 + 5 * taut) * h));
         P[i].addScaledVector(V[i], h);
       }
       if (ip > 0) { P[ip].copy(o.pin); V[ip].set(0, 0, 0); }

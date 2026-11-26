@@ -148,7 +148,7 @@ function strayStep(s, W, t, dt) {
   const ws = W.speed * hf * .82 * (1 + .25 * g1); // a linha que ela arrasta segura um pouco
   const wx = W.dx * ws - W.dz * ws * .35 * g2, wz = W.dz * ws + W.dx * ws * .35 * g2;
   const peso = 9.81 * (1 + Math.min(80, s.tl || 0) * STRAY.linhaKg / STRAY.massa);
-  const sust = 9.81 * (.9 + .3 * g3);                   // o pano rodopiando ora segura, ora não
+  const sust = 9.81 * (.84 + .3 * g3);                   // o pano rodopiando ora segura, ora não
   const k = STRAY.arrasto;
   v[0] += (k * (wx - v[0])) * dt;
   v[1] += (k * (0 - v[1]) * 1.4 + sust - peso) * dt;

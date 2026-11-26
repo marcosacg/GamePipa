@@ -16,8 +16,8 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 ## Câmeras e linha
 
 - **Tela limpa** (padrão): durante o jogo não aparece painel nem aviso (altura, vento, missão, "pipa avoada", "cruzou"...).
-  Fica só o contador de cortes (na disputa), a mira na primeira pessoa e os botões do celular. A linha fica **vermelha piscando**
-  quando está perto de arrebentar. Tecla **I** (ou o botão **ⓘ** no celular) mostra/esconde as informações; o jogo lembra a escolha.
+  Fica só o contador de cortes (na disputa), a mira na primeira pessoa e os botões do celular. A linha **não arrebenta sozinha**
+  (só é cortada por outra linha na disputa) e, sem dar linha, fica **sempre esticada**. Tecla **I** (ou o botão **ⓘ** no celular) mostra/esconde as informações; o jogo lembra a escolha.
 
 - **Três câmeras** (tecla **C**, ou o botão **🎥 câmera** no celular; o jogo lembra a última escolhida):
   - **Atrás do boneco**: a de sempre.
@@ -30,7 +30,7 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   O desenho é uma corda com física (`js/corda.js`): peso, vento empurrando de lado (como num fio), rajadas que correm pela
   linha e comprimento que não estica. Uma mola bem fraca a mantém perto do formato que a disputa usa (`js/shared/linha.js`):
   a enroscada, a rabiola presa e o aparar contam com a linha curvada, do jeito que aparece na tela.
-- Quando a pipa fica tão longe que vira um pontinho, um **círculo amarelo** marca onde ela está (vermelho se a linha estiver no limite).
+- Quando a pipa fica tão longe que vira um pontinho, um **círculo amarelo** marca onde ela está.
 - **Puxa e descarrega** (para subir rápido): as puxadas (**W**) enchem a **carga** (barra azul embaixo da tensão);
   soltando a linha (**S**) logo depois, a linha corre na mão e a pipa **dispara pra cima e pra longe** (a barra fica laranja).
   No ritmo puxa ~1 s / solta ~1 s ela sobe de 1,5 a 3 vezes mais rápido do que só dando linha. Os números ficam em `CARGA`,
@@ -40,8 +40,8 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   são correntes de laços com peso, arrastadas pelo vento e com **tremido** que corre do pé até a ponta, como fita de verdade.
   Ela segue a pipa com atraso: chicoteia nas cabeçadas e fica pra trás quando a pipa corre (`js/rabiola.js`, números em `RABIOLA`).
 - **Corte no ponto exato**: quando a linha é cortada, ela parte **exatamente no ponto onde a outra linha passou**.
-  O pedaço da mão até o corte cai solto com física (peso, vento de lado, encosta no chão, dobra e embola; o dono vai
-  recolhendo), e o pedaço do corte até a pipa vai junto com ela, no formato que tinha na hora (`js/linhasolta.js`).
+  O pedaço da mão até o corte cai solto com física de **linha leve** (flutua, faz ondas e "S" no vento, desce devagar,
+  encosta no chão, dobra e embola; depois de 3 s o dono vai recolhendo), e o pedaço do corte até a pipa vai junto com ela, no formato que tinha na hora (`js/linhasolta.js`).
   O comprimento desse pedaço é medido ao longo da linha (com barriga), e é ele que dá pra aparar.
 - **Avoada com física**: a pipa cortada sai com a velocidade que tinha, depois vai com o vento (que muda com a altura e
   tem rajadas de lado); a sustentação vai e volta conforme ela rodopia, e o pedaço de linha pesa. A pipa em si é uma
@@ -50,7 +50,9 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
   e o peso da própria linha (0,4 g por metro) puxa pra baixo: com muita linha ela fica um pouco mais baixa.
 - **Voo rápido e solto** (como pipa de combate): a embicada (A/D) é mais ágil e, com a linha frouxa, a pipa gira quase no
   lugar; esticada, ela segue pra onde o bico aponta. A **puxada** (W) dá um tiro na direção do bico. Os números ficam em
-  `FLY` no começo de `js/kite.js` (lift, dart = tiro da puxada, side = freio de lado).
+  `FLY` no começo de `js/kite.js` (lift, dart = tiro da puxada, side = freio de lado, peso = quantas vezes a gravidade:
+  1,25; vento = quanto o vento empurra a pipa pra longe: 1,8 deixa a linha sempre esticada, com tensão firme). A linha
+  voando fica reta quando esticada (só balança quando você dá linha).
 - **Avoada arrastando linha**: a pipa cortada sai levando o pedaço de linha do corte até ela. Dá para aparar encostando
   a sua linha na pipa **ou** na linha que ela arrasta.
 

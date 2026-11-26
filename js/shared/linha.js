@@ -14,11 +14,11 @@ export const POLY_N = 10;
 
 /**
  * Barriga da linha (m), no meio dela. dist = distância da mão até a pipa, L = linha solta.
- * Esticada ela ainda cai um pouco (2,2% da distância: 6,6 m com 300 m de linha); com folga cai bem mais.
+ * Esticada ela quase não cai (0,8% da distância: 2,4 m com 300 m de linha); com folga cai bem mais.
  */
 export function sagOf(dist, L) {
   const slack = Math.max(0, L - dist);
-  return Math.min(dist * 0.45, dist * 0.022 + slack * 0.55);
+  return Math.min(dist * 0.45, dist * 0.008 + slack * 0.55);
 }
 
 /**

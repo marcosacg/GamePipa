@@ -31,7 +31,7 @@ const TIPS = [
 const TIPS_DUEL = [
   'Cruze a sua linha na linha do outro para enroscar.',
   'Cruzou a linha? Mexa: W puxada ou S relo. Quem fica parado é cortado.',
-  'Não puxe com a tensão no vermelho: a sua linha arrebenta primeiro!',
+  'Puxada rápida na hora do cruzamento corta como cerol: quem puxa mais rápido ganha.',
   'Pipa laçada vira avoada: encoste a linha nela para aparar (+50).',
   'Prendeu a rabiola do outro? Encoste sua linha na dele: ele perde na hora e você apara a pipa.',
   'Pegaram sua rabiola? Afaste e sacuda com A/D, e não deixe as linhas encostarem!',
@@ -90,7 +90,7 @@ export function updateHUD(dt, camYaw) {
   const tr = clamp(Math.max(S.stress || 0, S.tension * .85) / (kt.breakN * LINE_STRENGTH), 0, 1);
   const bar = $('tensionBar').firstElementChild;
   bar.style.width = (tr * 100).toFixed(0) + '%';
-  const danger = S.state === 'voando' && S.overT > 0;
+  const danger = false; // a linha não arrebenta sozinha
   bar.style.background = danger || tr > .9 ? '#e63946' : tr > .65 ? '#ffd166' : '#06d6a0';
   $('tensionBar').classList.toggle('perigo', danger);
   if (danger && S.overT > BREAK_HOLD * .25 && !lineWarned && S.running) {

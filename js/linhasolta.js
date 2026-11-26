@@ -48,7 +48,7 @@ export class LinhaSolta {
    * opts: { peso, arrasto, chao(x,z) → altura do chão, comp: comprimento (m) se não vier pts }
    */
   constructor(pts, n = 24, opts = {}) {
-    this.n = n; this.peso = opts.peso ?? 4.5; this.arrasto = opts.arrasto ?? 4; this.chao = opts.chao || null;
+    this.n = n; this.peso = opts.peso ?? 3.5; this.arrasto = opts.arrasto ?? 4; // linha leve, mas cai (não fica boiando) this.chao = opts.chao || null;
     this.seed = Math.random() * 100;
     this.p = []; this.o = [];
     for (let i = 0; i <= n; i++) { this.p.push(new THREE.Vector3()); this.o.push(new THREE.Vector3()); }
@@ -89,9 +89,10 @@ export class LinhaSolta {
         if ((i === 0 && a) || (i === n && b)) continue;
         _v.subVectors(P[i], O[i]).multiplyScalar(1 / h);
         // vento que o ponto sente (com rajadas que correm pela linha), menos a velocidade dele
-        const s = i / n, g1 = noise1(t * 1.1 - s * 3 + this.seed), g2 = noise1(t * 1.6 - s * 4 + this.seed + 21);
+        // (as rajadas têm tamanho em metros: a linha faz ondas e "S" como fio leve no ar)
+        const m = i * this.seg, g1 = noise1(t * 1.1 - m * .16 + this.seed), g2 = noise1(t * 1.5 - m * .22 + this.seed + 21);
         _w.copy(windDirH).multiplyScalar(wind * (1 + .3 * g1));
-        _w.x += -windDirH.z * g2 * wind * .25; _w.z += windDirH.x * g2 * wind * .25; _w.y += g1 * .8;
+        _w.x += -windDirH.z * g2 * wind * .5; _w.z += windDirH.x * g2 * wind * .5; _w.y += g1 * 1.6 + noise1(t * .8 - m * .1 + this.seed + 40) * .9;
         _w.sub(_v);
         // fio: o vento empurra quase só de lado (pouco ao comprido)
         const j0 = Math.max(0, i - 1), j1 = Math.min(n, i + 1);

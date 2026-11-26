@@ -127,7 +127,7 @@ export class RemoteView {
       // linha cortada: o pedaço que ficou na mão dele cai solto (física) e ele vai recolhendo
       if (!this.solta) this.cutLine(null);
       this.soltaT += dt;
-      if (this.soltaT > 1.2) this.solta.recolher(Math.min(this.solta.len - 1, 7 * dt));
+      if (this.soltaT > 3) this.solta.recolher(Math.min(this.solta.len - 1, 3.5 * dt));
       this.solta.update(dt, this.hand, windDirH, this.windSpeed || 6, t);
       this.solta.write(lp, 0);
     } else if (!back) {

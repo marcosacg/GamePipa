@@ -329,7 +329,7 @@ export const isFail = st => st === 'enroscou' || st === 'caiu' || st === 'arrebe
 export const BACK_SCALE = .6;     // a pipa nas costas aparece menor para não cobrir o boneco
 const LAUNCH_TIME = .75;          // duração do lançamento (s)
 /* jeito de voar: pipa rápida e fluida (lift = força pra onde o bico aponta; dart = tiro na puxada; side = freio de lado) */
-export const FLY = { lift: 1.25, dart: 14, side: .65 };
+export const FLY = { lift: 1.25, dart: 14, side: .9, peso: 1.25, vento: 1.8 }; // peso = quantas vezes a gravidade (pipa mais pesada, não flutua)
 /* puxa e descarrega: as puxadas (W) enchem a "carga"; dando linha (S) logo depois a linha corre solta
    e a pipa dispara pra cima (sobe bem mais rápido do que só dando linha) */
 export const CARGA = { enche: 1.15, vaza: .25, gasta: .52, linha: 18, vsobe: 16, vsai: 13, puxa: 3 };
@@ -343,7 +343,7 @@ export function lineControl(dt) {
   else if (!keys.KeyS) S.carga = Math.max(0, c - dt * CARGA.vaza);                                                    // parado, vaza
   S.descarga = 0;
   if (keys.KeyS && !S.pulling) {
-    let rate = Math.min(6, .8 + S.rawT * 1.5);                    // a linha corre na mão conforme a pipa puxa
+    let rate = Math.min(6, .15 + S.rawT * 1.5);                   // a linha só corre na mão se a pipa puxa (sem puxar, quase não sai: não fica bamba)
     if (S.carga > .02) {
       // descarregando: a linha corre na mão só o tanto que a pipa puxa (sem ficar frouxa) e a pipa dispara pra onde o bico aponta
       S.descarga = S.carga;
@@ -355,6 +355,11 @@ export function lineControl(dt) {
   }
   if (keys.Space) S.L = Math.max(MIN_LINE, S.L - 7 * dt);
   if (S.pulling) S.L = Math.max(MIN_LINE, S.L - CARGA.puxa * dt);    // puxada: recolhe linha
+  // sem dar linha (S solto), a linha fica sempre esticada: a folga é recolhida sozinha
+  if (!keys.KeyS) {
+    const alvo = Math.max(MIN_LINE, S.kitePos.distanceTo(S.hand) + .15);
+    if (S.L > alvo) S.L = Math.max(alvo, S.L - 18 * dt);
+  }
 }
 const _eul = new THREE.Euler();
 
@@ -538,7 +543,7 @@ export function kitePhysicsStep(h, strayBodies) {
     }
 
     _f.addScaledVector(_nose, kt.lift * q * q * (.4 + .6 * tf) * FLY.lift);
-    _f.addScaledVector(_u, kt.push * q * q * (.4 + .6 * tf));
+    _f.addScaledVector(_u, kt.push * q * q * (.4 + .6 * tf) * FLY.vento); // o vento empurra a pipa pra longe: estica a linha
     // puxada: a pipa dá um tiro pra onde o bico aponta
     if (S.pulling && tf > .4 && S.stamina > .02) _f.addScaledVector(_nose, kt.mass * FLY.dart * tf);
     // descarregando: impulso pra onde o bico aponta e pra cima (a linha está correndo solta)
@@ -548,6 +553,9 @@ export function kitePhysicsStep(h, strayBodies) {
       _f.y += kt.mass * 6 * Math.max(0, CARGA.vsobe * d - _v.y) + kt.mass * 9.81 * d * .6;
       _f.addScaledVector(_u, kt.mass * 6 * Math.max(0, CARGA.vsai * d - _v.dot(_u)));
     }
+    // peso: a pipa é mais pesada que o puro "kt.mass" do motor (sente a gravidade de verdade, não flutua)
+    // (com a linha bamba ela perde a sustentação; aí o peso extra é aliviado para não despencar ao dar linha)
+    _f.y -= kt.mass * 9.81 * (FLY.peso - 1) * (.35 + .65 * tf);
     _tmp.copy(_v).addScaledVector(_u, -_v.dot(_u));
     _f.addScaledVector(_tmp, -FLY.side * kt.mass); // freio de lado: menor = pipa mais rápida e solta
     // linha inextensível: quando esticada, segura tudo que puxa pra fora
@@ -569,7 +577,7 @@ export function kitePhysicsStep(h, strayBodies) {
     // a pipa "deita" nas curvas (inclina para o lado em que está indo) e treme com o vento no pano
     const side = _v.dot(_eR);
     S.kiteBank += (clamp(-side * .045, -.55, .55) - S.kiteBank) * (1 - Math.exp(-6 * h));
-    const flut = Math.min(1, amag / 12) * (.03 + .05 * (1 - tf));
+    const flut = Math.min(1, amag / 12) * (.02 + .04 * (1 - tf));
     _tq.multiply(_qb.setFromAxisAngle(_zAx, S.kiteBank + noise1(S.clock * 9.5) * flut))
       .multiply(_qb.setFromAxisAngle(_xAx, noise1(S.clock * 8.3 + 5) * flut * .8));
     // com a linha esticada ela vira rápido; frouxa, gira solta (inércia)
@@ -580,7 +588,7 @@ export function kitePhysicsStep(h, strayBodies) {
     S.stress += (T + S.jerk - S.stress) * (1 - Math.exp(-h / .4));
     const lim = kt.breakN * LINE_STRENGTH;
     if (S.stress > lim) S.overT += h; else S.overT = Math.max(0, S.overT - h * 1.5);
-    if (S.overT > BREAK_HOLD && S.running) failKite('arrebentou', 'A linha arrebentou!', 'Ficou muito tempo no vermelho. Dê linha para aliviar.');
+    // (a linha não arrebenta sozinha: só é cortada por outra linha na disputa)
     if (_p.y < groundH(_p.x, _p.z) + .45 && S.running) failKite('caiu', 'Caiu ' + SCN.fallLabel(_p.x, _p.z) + '!', 'Mantenha a linha esticada!');
   } else if (S.state === 'enroscou') {
     setPos(body, S.stuckPos); setVel(body, ZERO_V);
@@ -708,7 +716,7 @@ export function updateMyLine(dt) {
     // cortada/arrebentada: o pedaço que ficou na mão cai solto, com física, do formato exato que tinha
     if (!myCut) cortarMinhaLinha(null);
     lp.setXYZ(0, spool.x, spool.y, spool.z);
-    if (S.stateTimer > 1.2) myCut.recolher(Math.min(myCut.len - 1, 7 * dt)); // e o jogador vai recolhendo
+    if (S.stateTimer > 3) myCut.recolher(Math.min(myCut.len - 1, 3.5 * dt)); // e o jogador vai recolhendo, sem pressa
     myCut.update(dt, from, S.windDirH, S.windSpeed, S.clock);
     myCut.write(lp, 1);
     lineObj.material.color.copy(_linCor);
@@ -718,8 +726,7 @@ export function updateMyLine(dt) {
   myCut = null;
   if (!lineObj.visible) { myRope.reset(); return; }
   lp.setXYZ(0, spool.x, spool.y, spool.z);
-  const lim = G.kite.kt.breakN * LINE_STRENGTH, perigo = Math.max(0, Math.min(1, (S.stress / lim - .6) / .35)) + (S.overT > 0 ? .3 : 0);
-  lineObj.material.color.copy(_linCor).lerp(_linPerigo, Math.min(1, perigo) * (.6 + .4 * Math.sin(S.clock * 18) ** 2));
+  lineObj.material.color.copy(_linCor);
   const L = S.state === 'voando' ? S.L : from.distanceTo(S.kitePos) + 1;
   myRope.update(dt, from, S.kitePos, L, S.windDirH, S.windSpeed, S.clock, { pin: S.duelX, giving: !!keys.KeyS && S.state === 'voando' });
   myRope.write(lp, 1);
