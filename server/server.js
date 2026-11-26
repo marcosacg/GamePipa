@@ -8,6 +8,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Arena, DUEL, KITE_TYPES, PROTOCOL, SCENES } from '../js/shared/duel.js';
+import { VERSAO } from '../js/shared/versao.js';
 import { approxGround } from '../js/shared/terrenos.js';
 import { VENDOR, ensureVendor } from './vendor.js';
 
@@ -218,7 +219,7 @@ function onConnection(conn) {
       room.players.set(id, { conn, meta, state: null, slot });
       room.arena.addPlayer(id, meta);
       conn.send({
-        t: 'welcome', v: PROTOCOL, id, slot, room: room.code, scene: room.scene, rt: room.time(), round: room.round,
+        t: 'welcome', v: PROTOCOL, ver: VERSAO, id, slot, room: room.code, scene: room.scene, rt: room.time(), round: room.round,
         players: [...room.players].filter(([pid]) => pid !== id).map(([pid, p]) => publicPlayer(pid, p)),
         scores: room.arena.scores(),
       });
@@ -300,7 +301,7 @@ setInterval(() => {
 }, TICK * 1000);
 
 server.listen(PORT, () => {
-  console.log('\n  RABIOLA — servidor no ar!\n');
+  console.log('\n  RABIOLA — servidor no ar!  (versão ' + VERSAO + ')\n');
   console.log('  Neste computador:  http://localhost:' + PORT);
   for (const list of Object.values(os.networkInterfaces())) {
     for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log('  Na mesma rede:     http://' + a.address + ':' + PORT);

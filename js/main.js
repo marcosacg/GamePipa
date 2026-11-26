@@ -19,6 +19,20 @@ import { isTouch, initTouch, updateTouch, goFullscreen } from './touch.js';
 import { LocalSession } from './bots.js';
 import { NetSession, serverURL } from './net.js';
 import { Ads } from './platform.js';
+import { VERSAO, DATA_VERSAO } from './shared/versao.js';
+
+// número da versão no canto inferior direito (e a do servidor, quando joga online)
+{
+  const el = document.getElementById('versao');
+  if (el) {
+    el.textContent = 'v' + VERSAO;
+    el.title = 'Versão ' + VERSAO + ' (' + DATA_VERSAO + ')';
+    window.__versaoServidor = sv => {
+      const ok = sv === VERSAO;
+      el.innerHTML = 'v' + VERSAO + (ok ? '' : ' · <span class="velho">servidor v' + String(sv).replace(/[^\w.?-]/g, '') + '</span>');
+    };
+  }
+}
 import {
   cam, updateWind, updatePlayer, updateCamera, updateLogic, strayForces, setPlayerStyle, setKite,
   startGame, toMenu, setPause, continueFree, advanceClockKey, placePlayer,

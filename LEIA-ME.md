@@ -13,6 +13,12 @@ O jogo agora é dividido em vários arquivos, então precisa rodar por um servid
 3. Na **primeira vez** precisa de internet: o servidor baixa Three.js, Ammo.js e as fontes para a pasta `vendor/`.
    Depois disso o jogo roda **sem internet**. (Para baixar tudo de uma vez: `npm run vendor`.)
 
+## Versão
+
+O número da versão aparece no canto inferior direito da tela (ex.: **v2.2.0**). Jogando online, se o servidor estiver
+com outra versão, aparece também **servidor vX** em amarelo (sinal de que o Render ainda não atualizou ou faltou Ctrl+F5).
+O número fica em `js/shared/versao.js` (e em `package.json`); o servidor também mostra a versão quando liga.
+
 ## Câmeras e linha
 
 - **Tela limpa** (padrão): durante o jogo não aparece painel nem aviso (altura, vento, missão, "pipa avoada", "cruzou"...).

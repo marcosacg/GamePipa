@@ -1,6 +1,6 @@
 {
   "name": "rabiola",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Rabiola — jogo de pipa 3D com Three.js e Ammo.js, com disputa online",
   "type": "module",
   "private": true,

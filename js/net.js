@@ -45,6 +45,8 @@ export class NetSession {
           this.sync(m.rt); this.round = m.round; this.scores = m.scores || [];
           for (const p of m.players) this.others.set(p.id, { meta: p, state: null });
           if (m.v !== PROTOCOL) this.events.push({ type: 'oldServer' });
+          this.serverVer = m.ver || '?';
+          if (window.__versaoServidor) window.__versaoServidor(this.serverVer);
           onWelcome(this);
           break;
         case 'error':
