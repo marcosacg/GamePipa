@@ -113,14 +113,20 @@
 
 <!-- ================= HUD ================= -->
 <div id="hud" class="hidden">
+  <div id="cortes" class="hidden" title="Pipas cortadas seguidas (zera quando você perde a pipa)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20 10 L12 18 L4 10 Z" fill="#9ec5ff" stroke="#0d1b2a" stroke-width="1.4"/><path d="M12 18 q-2 2 0 3 q2 1 0 3" fill="none" stroke="#9ec5ff" stroke-width="1.4"/></svg>
+    <b>0</b>
+  </div>
   <div id="stats" class="panel">
     <div class="line"><span>Altura</span><span class="big" id="hAlt">0 m</span></div>
-    <div class="line"><span>Linha</span><span id="hLine">0 / 150 m</span></div>
+    <div class="line"><span>Linha</span><span id="hLine">0 / 300 m</span></div>
     <div class="line"><span>Pontos</span><span id="hScore">0</span></div>
     <div class="line"><span>Estado</span><span id="hState">Voando</span></div>
     <div id="tensionWrap">
       <div class="line small"><span>Tensão da linha</span><span id="hTen">0 N</span></div>
       <div id="tensionBar" class="meter"><i></i></div>
+      <div class="line small" id="cargaLine"><span>Carga <small>(W enche · S solta)</small></span><span id="hCarga">0%</span></div>
+      <div id="cargaBar" class="meter"><i></i></div>
     </div>
   </div>
 
@@ -162,8 +168,9 @@
   <div id="help" class="panel hidden">
     <kbd>A</kbd>/<kbd>D</kbd> embicar · <kbd>W</kbd> puxada · <kbd>S</kbd> dar linha · <kbd>Espaço</kbd> recolher<br>
     <kbd>↑↓←→</kbd> andar · <kbd>Shift</kbd> correr · <kbd>E</kbd> soltar a pipa · <kbd>R</kbd> guardar nas costas · <kbd>T</kbd> avançar hora (livre)<br>
-    Vento fraco? Corra pra trás (<kbd>↓</kbd>) ou dê puxadas.<br>
-    Disputa: cruze a sua linha na linha do outro. Rabiola presa só vira disputa se as linhas encostarem; quem foi preso afasta a pipa pra rabiola escorregar e soltar.
+    <kbd>C</kbd> trocar a câmera (atrás do boneco, no ombro, primeira pessoa) · <kbd>Z</kbd> ou roda do mouse: zoom · arraste para olhar em volta<br>
+    Vento fraco? Corra pra trás (<kbd>↓</kbd>) ou dê puxadas. <b>Puxa e descarrega:</b> puxadas (<kbd>W</kbd>) enchem a carga e soltando a linha (<kbd>S</kbd>) logo depois a pipa dispara pra cima.<br>
+    Disputa: cruze a sua linha na do outro e mexa a linha (puxada ou relo) para cortar; quem fica parado é cortado. Rabiola presa só vira disputa se as linhas encostarem; quem foi preso afasta a pipa pra rabiola escorregar e soltar.
   </div>
 </div>
 
@@ -179,6 +186,8 @@
   </div>
   <button id="tLaunch" class="tb hidden" data-tap="KeyE">SOLTAR<br>PIPA</button>
   <div id="tTop">
+    <button class="tb mini" data-tap="KeyC" title="Trocar a câmera">🎥 câmera</button>
+    <button class="tb mini" data-tap="KeyZ" title="Zoom (câmeras novas)">🔍</button>
     <button class="tb mini" data-tap="KeyR" title="Guardar a pipa nas costas">↩ costas</button>
     <button class="tb mini" data-tap="Escape" title="Pausa">❚❚</button>
   </div>

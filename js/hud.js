@@ -20,6 +20,7 @@ export function toast(t, sub = '', cls = '', dur = 2) {
 
 const TIPS = [
   'Vento fraco? Corra pra trás (↓) ou dê puxadas com W.',
+  'Pra subir rápido: dê puxadas (W) e logo depois solte a linha (S). Puxa e descarrega!',
   'A rabiola endireita a pipa sozinha. Solte A/D e ela volta pro prumo.',
   'Perto das árvores o vento embola. Suba alto antes de passear.',
   'Cuidado com os fios do poste do lado direito do campo!',
@@ -28,7 +29,7 @@ const TIPS = [
 ];
 const TIPS_DUEL = [
   'Cruze a sua linha na linha do outro para enroscar.',
-  'Na enroscada: W puxa (gasta fôlego), S dá linha. Pipa por cima leva vantagem.',
+  'Cruzou a linha? Mexa: W puxada ou S relo. Quem fica parado é cortado.',
   'Não puxe com a tensão no vermelho: a sua linha arrebenta primeiro!',
   'Pipa laçada vira avoada: encoste a linha nela para aparar (+50).',
   'Prendeu a rabiola do outro? Encoste sua linha na dele: ele perde na hora e você apara a pipa.',
@@ -37,7 +38,27 @@ const TIPS_DUEL = [
 
 let hudT = 0, tipT = 0, tipI = 0;
 let lineWarned = false;
+/* contador de cortes seguidos (embaixo, no meio): só na disputa; pega fogo a partir de 5 */
+let cortesShown = -1;
+function updateCortes() {
+  const el = $('cortes'), on = S.running && !!G.session;
+  el.classList.toggle('hidden', !on);
+  if (!on) return;
+  const n = S.cortes || 0;
+  if (n !== cortesShown) {
+    el.querySelector('b').textContent = n;
+    el.classList.toggle('fogo', n >= 5);
+    if (n > cortesShown && cortesShown >= 0) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    cortesShown = n;
+  }
+}
 export function updateHUD(dt, camYaw) {
+  updateCortes();
+  // carga das puxadas (puxa e descarrega)
+  const cg = S.carga || 0;
+  $('hCarga').textContent = S.descarga > 0 ? 'soltando!' : Math.round(cg * 100) + '%';
+  $('cargaBar').firstElementChild.style.width = (cg * 100).toFixed(0) + '%';
+  $('cargaBar').classList.toggle('solta', S.descarga > 0);
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').className = ''; }
   // contagem para soltar outra pipa
   const waiting = S.running && (S.state === 'enroscou' || S.state === 'caiu' || S.state === 'arrebentou');
@@ -56,7 +77,7 @@ export function updateHUD(dt, camYaw) {
   $('hAlt').textContent = Math.max(0, S.kitePos.y).toFixed(0) + ' m';
   $('hLine').textContent = S.L.toFixed(0) + ' / ' + MAX_LINE + ' m';
   $('hScore').textContent = disputa ? myScore() : S.score;
-  const stTxt = { voando: S.tension < .25 ? 'Linha bamba' : (S.pulling ? 'Puxando' : 'Voando'), costas: 'Nas costas', lancando: 'Soltando…', enroscou: 'Enroscou', caiu: 'Caiu', arrebentou: S.hideKite ? 'Laçada!' : 'Avoou!' }[S.state];
+  const stTxt = { voando: S.descarga > 0 ? 'Descarregando!' : S.tension < .25 ? 'Linha bamba' : (S.pulling ? 'Puxando' : 'Voando'), costas: 'Nas costas', lancando: 'Soltando…', enroscou: 'Enroscou', caiu: 'Caiu', arrebentou: S.hideKite ? 'Laçada!' : 'Avoou!' }[S.state];
   $('hState').textContent = stTxt;
   // a barra mostra o esforço da linha até o limite; no vermelho, pisca e avisa antes de arrebentar
   const tr = clamp(Math.max(S.stress || 0, S.tension * .85) / (kt.breakN * LINE_STRENGTH), 0, 1);
@@ -144,7 +165,7 @@ function updateDisputaHUD() {
     else if (dg > 0) { $('duelTitle').textContent = 'PERIGO! ' + falta + ' s para escapar de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> <b>afaste a sua linha da dele</b> (a contagem volta) e sacuda pra rabiola soltar'; }
     else if (d.kind === 'rabiola' && d.att === ss.myId) { $('duelTitle').textContent = 'Rabiola presa na sua linha:'; $('duelKeys').innerHTML = 'Encoste a <b>sua linha</b> na dele e segure ' + DUEL.dangerTime + ' s para <b>aparar</b>'; }
     else if (d.kind === 'rabiola') { $('duelTitle').textContent = 'Sua rabiola prendeu na linha de'; $('duelKeys').innerHTML = '<kbd>A</kbd>/<kbd>D</kbd> afaste a pipa pra esticar · sacudir ajuda · <b>não deixe as linhas encostarem!</b>'; }
-    else { $('duelTitle').textContent = 'ENROSCADA com'; $('duelKeys').innerHTML = '<kbd>W</kbd> puxa · <kbd>S</kbd> dá linha · <b>alterne os dois</b>: segurar um só perde força'; }
+    else { $('duelTitle').textContent = 'CRUZOU com'; $('duelKeys').innerHTML = '<b>Mexa a linha!</b> <kbd>W</kbd> puxada · <kbd>S</kbd> relo · passe a pipa rápido · quem fica parado é cortado'; }
     $('duelName').textContent = name;
     $('duel').classList.toggle('tail', d.kind === 'rabiola');
     if (d.kind === 'rabiola') {

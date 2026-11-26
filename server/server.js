@@ -233,9 +233,9 @@ function onConnection(conn) {
     if (m.t === 'state') {
       const s = {
         pos: vec(m.pos), yaw: num(m.yaw, 0, 10), mv: num(m.mv, 0, 20),
-        hand: vec(m.hand), k: vec(m.k), q: vec(m.q, 4), L: num(m.L, 10, 200),
+        hand: vec(m.hand), k: vec(m.k), q: vec(m.q, 4), L: num(m.L, 10, 400),
         T: num(m.T, 0, 500), breakN: num(m.breakN, 30, 200), st: str(m.st, 12, 'voando'),
-        flying: !!m.flying, pull: !!m.pull, give: !!m.give, sta: num(m.sta, 1, 1),
+        flying: !!m.flying, pull: !!m.pull, give: !!m.give, reel: !!m.reel, sta: num(m.sta, 1, 1),
         te: Array.isArray(m.te) ? vec(m.te) : null, n: Math.round(num(m.n, 0, 30)), shake: !!m.shake,
       };
       me.state = s; me.lastAt = Date.now();
@@ -273,7 +273,7 @@ setInterval(() => {
     if (room.round.state === 'playing') {
       const ev = room.arena.update(TICK, t);
       for (const e of ev) room.broadcast({ t: 'ev', e });
-      if (ev.some(e => e.type === 'duelEnd' || e.type === 'catch')) room.scoreTimer = 0;
+      if (ev.some(e => e.type === 'duelEnd' || e.type === 'catch' || e.type === 'hangHome')) room.scoreTimer = 0;
     }
     // quem parou de mandar dados (aba em segundo plano, conexão ruim) não pode ficar congelado disputando
     const now = Date.now();
@@ -288,9 +288,10 @@ setInterval(() => {
         const s = p.state;
         // o servidor manda o estado "oficial": laçado (linha arrebentou) vale mesmo se o navegador dele estiver parado
         const st = room.arena.isLost(pid) ? 'arrebentou' : p.stale ? 'ausente' : s.st;
-        return { id: pid, pos: s.pos.map(r2), yaw: r2(s.yaw), mv: r2(s.mv), hand: s.hand.map(r2), k: s.k.map(r2), q: s.q.map(v => Math.round(v * 1000) / 1000), L: r2(s.L), st, pull: s.pull, shake: s.shake };
+        return { id: pid, pos: s.pos.map(r2), yaw: r2(s.yaw), mv: r2(s.mv), hand: s.hand.map(r2), k: s.k.map(r2), q: s.q.map(v => Math.round(v * 1000) / 1000), L: r2(s.L), st, pull: s.pull, give: s.give, shake: s.shake, n: s.n };
       }),
-      s: room.arena.strays.map(s => ({ id: s.id, p: s.p.map(r2), kite: s.kite })),
+      s: room.arena.strays.map(s => ({ id: s.id, p: s.p.map(r2), kite: s.kite, tl: Math.round(s.tl || 0) })),
+      hg: room.arena.hangs.map(h => ({ id: h.id, by: h.by, f: Math.round(h.f * 1000) / 1000, kite: h.kite })),
       d: room.arena.duels.map(d => ({ a: d.a, b: d.b, prog: r2(d.prog), x: d.x.map(r2), kind: d.kind, att: d.att, f: r2(d.f || 0), st: r2(d.stretch || 0), dg: r2(d.dg || 0) })),
     };
     if (room.scoreTimer <= 0) { snap.sc = room.arena.scores(); room.scoreTimer = 1; }

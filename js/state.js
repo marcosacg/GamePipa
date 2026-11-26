@@ -36,5 +36,6 @@ export const G = {
   session: null,     // sessão de disputa (bots ou online)
   remotes: new Map(),
   strayViews: new Map(),
+  hangViews: new Map(),   // pipas aparadas penduradas na linha de alguém (disputa/online)
   hooks: { onFail: null },
 };

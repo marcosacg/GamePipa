@@ -1,7 +1,8 @@
 // Pipa aparada: a RABIOLA da avoada enrosca na linha de quem aparou. A pipa fica pendurada pela
 // rabiola, de cabeça pra baixo, balançando; o resto da rabiola e uns fios embolados caem do outro lado
-// da linha, e a linha dela fica solta, pendurada no bico. Escorrega devagar por 6 segundos e aí vem o "Aparou!".
-// É só visual: os pontos continuam sendo decididos pelo jogo (livre) ou pela arena (disputa/online).
+// da linha, e a linha dela fica solta, pendurada no bico. Aos 6 segundos vem o "Aparou!", e ela CONTINUA pendurada,
+// escorregando até a mão de quem aparou (Espaço traz mais rápido). Puxada rápida corta a rabiola e ela sai avoada.
+// Na disputa/online quem decide (onde ela está, se cortou, se chegou) é a arena; no modo livre, este arquivo.
 import * as THREE from 'three';
 import { noOutline } from './materials.js';
 import { KITES } from './config.js';
@@ -48,9 +49,15 @@ function makeLineObj(n, color) {
 }
 
 class Hanging {
-  constructor({ kite, from, line, onArrive, onDrop }) {
+  /**
+   * persist: continua pendurada depois do "Aparou!" · getF(): onde ela está na linha (arena), ou null
+   * reel(): recolhendo (Espaço) · rip(): puxada rápida agora (quanto passou do limite) · onHome / onCut
+   */
+  constructor({ kite, from, line, onArrive, onDrop, persist = false, getF = null, reel = null, rip = null, onHome = null, onCut = null, f0 = null }) {
+    if (!from) { const l0 = line(); from = l0 && f0 != null ? lineAt(l0, f0, new THREE.Vector3()) : new THREE.Vector3(0, 20, 0); }
     const type = KITES[kite.type] ? kite.type : 'pipa', pat = kite.pat || 0;
     this.getLine = line; this.onArrive = onArrive; this.onDrop = onDrop;
+    this.persist = persist; this.getF = getF; this.reel = reel; this.rip = rip; this.onHome = onHome; this.onCut = onCut; this.rp = 0;
     this.mesh = makeKiteMesh(type, pat); this.mesh.scale.setScalar(.9);
     this.n = Math.max(5, Math.min(11, KITES[type].tail));
     this.up = Math.ceil(this.n * .55);            // laços entre a pipa e a linha; o resto cai do outro lado
@@ -66,13 +73,14 @@ class Hanging {
     this.pos = new THREE.Vector3().copy(from); this.vel = new THREE.Vector3();
     this.hook = new THREE.Vector3();
     const l = line();
-    this.f = l ? nearestF(l, from) : .5;
+    this.f = f0 != null ? f0 : l ? nearestF(l, from) : .5;
     this.t = 0; this.v = 0; this.ph = Math.random() * 10; this.dropped = false; this.done = false;
     this.side = Math.random() < .5 ? 1 : -1;
     this.dangle = []; for (let i = 0; i <= ND; i++) this.dangle.push(new THREE.Vector3().copy(from));
   }
 
   update(dt, t, windDirH) {
+    if (this.done) return false;
     this.t += dt;
     let line = this.dropped ? null : this.getLine();
     if (line && !line.visible) line = null;
@@ -84,14 +92,29 @@ class Hanging {
     // escorrega pela linha até a mão (devagar no começo, depois mais rápido)
     if (line) {
       const L = lineLength(line) || 1;
-      if (this.t > GRUDA) {
-        this.v = Math.min(.8, this.v + .6 * dt); // escorrega bem devagar pela linha, balançando (dura os 6 s)
+      const fT = this.getF ? this.getF() : null;
+      if (fT != null) this.f += (fT - this.f) * (1 - Math.exp(-6 * dt));   // a arena diz onde ela está
+      else if (this.t > GRUDA) {
+        const vmax = this.persist ? (this.reel && this.reel() ? 3 : .5) : .8;
+        this.v = Math.min(vmax, this.v + .6 * dt); // escorrega devagar pela linha, balançando
+        if (this.v > vmax) this.v = vmax;
         this.f -= this.v * dt / L;
       }
-      this.f = Math.max(this.f, Math.min(.5, 2 / L)); // para a uns 2 m da mão: fica sempre os 6 s pendurada
+      if (!this.persist) this.f = Math.max(this.f, Math.min(.5, 2 / L)); // (antigo) para a uns 2 m da mão
+      else if (!this.getF && this.f * L <= 3) { this.home(); return false; } // chegou na mão: guardada
       lineAt(line, this.f, this.hook);
     } // sem linha por um instante: fica balançando no último ponto
-    if (this.t >= DURACAO) { this.arrive(); return false; }
+    if (this.t >= DURACAO && !this.arrived) {
+      this.arrived = true;
+      if (this.onArrive) this.onArrive(this.pos.clone()); // o aviso aparece em cima da pipa aparada
+      if (!this.persist) { this.dispose(); return false; }
+    }
+    // modo livre: puxada rápida corta a rabiola e ela sai avoada
+    if (this.rip && this.t > 1.5) {
+      const r = this.rip();
+      this.rp = r > 0 ? this.rp + r * .55 * dt : Math.max(0, this.rp - dt);
+      if (this.rp >= 1) { const p = this.hook.clone(); this.dispose(); if (this.onCut) this.onCut(p); return false; }
+    }
 
     // pipa pendurada: ponto com massa preso no gancho por um pedaço de linha (balança sozinha)
     _w.copy(windDirH).multiplyScalar(4.5);
@@ -192,13 +215,17 @@ class Hanging {
     p.needsUpdate = true;
   }
 
-  /** chegou na mão de quem aparou */
-  arrive() {
+  /** chegou na mão de quem aparou: guardada */
+  home() {
     if (this.done) return;
-    this.done = true;
-    if (this.onArrive) this.onArrive(this.pos.clone()); // o aviso aparece em cima da pipa aparada
+    const p = this.pos.clone();
     this.dispose();
+    if (this.onHome) this.onHome(p);
   }
+  /** tira da tela agora (a arena cortou a rabiola: ela virou avoada, ou chegou na mão) */
+  remove() { if (!this.done) this.dispose(); }
+  /** ponto onde ela está presa na linha */
+  get hookPos() { return this.hook; }
   /** a linha de quem aparou sumiu (arrebentou, enroscou...): a avoada cai */
   drop() {
     this.dropped = true; this.t = 0;

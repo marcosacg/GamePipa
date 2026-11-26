@@ -37,7 +37,7 @@ class Bot {
     this.ph = Math.random() * 10; this.tilt = 0;
     this.hand = [base[0], this.pos[1] + 1.3, base[1]]; this.k = [base[0], this.pos[1] + 20, base[1] - 20]; this.q = [0, 0, 0, 1];
     this.yaw = Math.PI; this.mv = 0; this.T = 3; this.skill = rnd(.7, 1.1);
-    this.n = Math.min(10, KITES[meta.kite.type]?.tail || 0); this.te = null;
+    this.n0 = this.n = Math.min(10, KITES[meta.kite.type]?.tail || 0); this.te = null;
     this.aimTail = false; this.shake = false; this.shakeT = 0;
   }
   update(dt, t, W, arena, states) {
@@ -55,7 +55,7 @@ class Bot {
 
     if (!this.flying) {
       this.respawn -= dt;
-      if (this.respawn <= 0 && !(this.onBack > 0)) this.onBack = rnd(1.2, 2.2); // pega pipa nova e põe nas costas
+      if (this.respawn <= 0 && !(this.onBack > 0)) { this.onBack = rnd(1.2, 2.2); this.n = this.n0; } // pega pipa nova (rabiola inteira) e põe nas costas
       if (this.onBack > 0) {
         this.onBack -= dt;
         if (this.onBack <= 0) { this.flying = true; this.L = 12; this.az = 0; this.el = .5; }
@@ -96,7 +96,7 @@ class Bot {
       }
     } else this.escDir = 0;
     desAz = cl(desAz, -1.1, 1.1);
-    const turn = .35 * this.skill;
+    const turn = .6 * this.skill; // pipas dos bots mais rápidas no céu
     this.az += cl(desAz - this.az, -turn * dt, turn * dt);
     if (this.flying) this.L += cl(desL - this.L, -3 * dt, 3 * dt);
     this.el += cl((.85 + .12 * Math.sin(t * .31 + this.ph)) * Math.min(1, W.speed / 5) - this.el, -.3 * dt, .3 * dt);
@@ -122,13 +122,13 @@ class Bot {
     this.yaw = Math.atan2(this.k[0] - this.hand[0], this.k[2] - this.hand[2]);
     this.te = this.n > 0 ? tailEndFromWind(this.k, W, this.n) : null;
 
-    // tática na enroscada: puxadas em rajadas, administrando o fôlego
+    // tática no corte: puxadas e relos em rajadas, administrando o fôlego
     if (duel) {
       this.pullT -= dt;
       if (this.pullT <= 0) {
         this.pull = this.sta > .35 && Math.random() < .55 * this.skill;
-        this.give = !this.pull && Math.random() < .5;
-        this.pullT = rnd(.6, 1.6);
+        this.give = !this.pull && Math.random() < .75; // no corte quem fica parado perde: o bot quase sempre mexe a linha
+        this.pullT = rnd(.4, 1.1);
       }
       // rabiola presa: sacode a pipa de um lado pro outro
       const victim = duel.kind === 'rabiola' && duel.att !== this.id;
@@ -175,7 +175,7 @@ export class LocalSession {
       this.arena.addPlayer(b.id, meta);
       this.others.set(b.id, { meta, state: null });
     }
-    this.strays = []; this.duels = []; this.scores = this.arena.scores();
+    this.strays = []; this.duels = []; this.hangs = []; this.scores = this.arena.scores();
   }
   time() { return this.t; }
   sendState(st) { this.myState = st; this.arena.setState('eu', st); }
@@ -199,10 +199,12 @@ export class LocalSession {
       const ev = this.arena.update(dt, this.t);
       for (const e of ev) {
         if (e.type === 'duelEnd') { const b = this.bots.find(x => x.id === e.loser); if (b) { b.flying = false; b.respawn = 2; } }
+        if (e.type === 'tailCut') { const b = this.bots.find(x => x.id === e.vic); if (b) b.n = Math.max(1, Math.round(b.n * e.f)); } // rabiola cortada: fica curta até a próxima pipa
         this.events.push(e);
       }
     }
     this.strays = this.arena.strays;
+    this.hangs = this.arena.hangs;
     this.duels = this.arena.duels;
     this.scores = this.arena.scores();
   }

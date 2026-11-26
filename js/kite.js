@@ -1,11 +1,13 @@
 // Pipas: desenho (formatos, estampas, rabiola) e a física da pipa do jogador
 import * as THREE from 'three';
 import { toonMat, noOutline } from './materials.js';
-import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
+import { Corda } from './corda.js';
+import { KITES, getPatterns, G_KITE, G_GROUND, G_STATIC, G_TAIL, MIN_LINE, MAX_LINE, LINE_STRENGTH, BREAK_HOLD } from './config.js';
 import { S, G, keys } from './state.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, setRot, forEachContact, UP } from './physics.js';
 import { scene, mesh, mat, smat, groundH, trees, SCN } from './scene.js';
 import { lerp, smooth, wrapAngle, noise1 } from './utils.js';
+import { heightWind, highGust } from './shared/linha.js';
 
 /* =========================================================
    Formatos (coordenadas da pipa, tamanho 1)
@@ -273,6 +275,39 @@ export function destroyKite() {
   G.kite = null;
 }
 
+/**
+ * Rabiola cortada no ponto f (0 = pé da pipa, 1 = ponta): a pipa fica só com o pedaço de cima
+ * (mais instável até a próxima pipa) e o resto cai rodopiando.
+ */
+const pieces = [];
+export function cutTail(f) {
+  const k = G.kite, n = k.links.length;
+  if (!n) return 0;
+  const keep = Math.max(1, Math.min(n - 1, Math.round(f * n)));
+  if (keep >= n) return n;
+  // o pedaço que soltou: cai com o vento
+  const pts = k.pts.slice(keep).map(p => p.clone());
+  const piece = { tail: new TailRenderer(S.kiteType, S.patIdx, pts.length - 1), pts, vel: new THREE.Vector3(0, -1, 0), t: 0 };
+  pieces.push(piece);
+  for (let i = n - 1; i >= keep; i--) {
+    PH.world.removeConstraint(k.cons[i]); PH.A.destroy(k.cons[i]);
+    removeBody(k.links[i]);
+  }
+  k.cons.length = keep; k.links.length = keep; k.pts.length = keep + 1;
+  k.tail.dispose(); k.tail = new TailRenderer(S.kiteType, S.patIdx, keep);
+  return keep;
+}
+function updatePieces(dt) {
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    const pc = pieces[i];
+    pc.t += dt;
+    pc.vel.y = Math.max(-3, pc.vel.y - 2 * dt);
+    pc.pts.forEach((p, j) => { p.addScaledVector(pc.vel, dt).addScaledVector(S.windDirH, (1.5 + j * .1) * dt); p.x += Math.sin(S.clock * 3 + j) * .02; });
+    pc.tail.update(pc.pts, S.clock, S.windDirH);
+    if (pc.t > 3.5 || pc.pts[0].y < groundH(pc.pts[0].x, pc.pts[0].z)) { pc.tail.dispose(); pieces.splice(i, 1); }
+  }
+}
+
 /** desenho da rabiola presa: até o ponto preso ela vai até a linha; depois continua pendurada do outro lado */
 const _pinOff = new THREE.Vector3();
 export function pinTail(pts, tug, f) {
@@ -290,6 +325,34 @@ export function pinTail(pts, tug, f) {
 export const isFail = st => st === 'enroscou' || st === 'caiu' || st === 'arrebentou';
 export const BACK_SCALE = .6;     // a pipa nas costas aparece menor para não cobrir o boneco
 const LAUNCH_TIME = .75;          // duração do lançamento (s)
+/* jeito de voar: pipa rápida e fluida (lift = força pra onde o bico aponta; dart = tiro na puxada; side = freio de lado) */
+export const FLY = { lift: 1.25, dart: 14, side: .65 };
+/* puxa e descarrega: as puxadas (W) enchem a "carga"; dando linha (S) logo depois a linha corre solta
+   e a pipa dispara pra cima (sobe bem mais rápido do que só dando linha) */
+export const CARGA = { enche: 1.15, vaza: .25, gasta: .52, linha: 18, vsobe: 16, vsai: 13, puxa: 3 };
+
+/** controle da linha (W puxa, S dá linha / descarrega, Espaço recolhe) — chamado a cada quadro */
+export function lineControl(dt) {
+  const c = S.carga || 0;
+  if (S.state !== 'voando') { S.pulling = false; S.carga = Math.max(0, c - dt); S.descarga = 0; return; }
+  S.pulling = !!keys.KeyW;
+  if (S.pulling && S.stamina > .02) S.carga = Math.min(1, c + dt * CARGA.enche * Math.min(1, .35 + S.tension / 8)); // puxada enche
+  else if (!keys.KeyS) S.carga = Math.max(0, c - dt * CARGA.vaza);                                                    // parado, vaza
+  S.descarga = 0;
+  if (keys.KeyS && !S.pulling) {
+    let rate = Math.min(6, .8 + S.rawT * 1.5);                    // a linha corre na mão conforme a pipa puxa
+    if (S.carga > .02) {
+      // descarregando: a linha corre na mão só o tanto que a pipa puxa (sem ficar frouxa) e a pipa dispara pra onde o bico aponta
+      S.descarga = S.carga;
+      S.carga = Math.max(0, S.carga - dt * CARGA.gasta);
+      const dist = S.kitePos.distanceTo(S.hand);
+      const solta = dist + .3 + Math.max(0, S.kiteVr || 0) * .15;   // um pouco à frente de onde a pipa vai estar
+      S.L = Math.min(MAX_LINE, Math.max(S.L + rate * dt * .5, Math.min(solta, S.L + CARGA.linha * dt)));
+    } else S.L = Math.min(MAX_LINE, S.L + rate * dt);
+  }
+  if (keys.Space) S.L = Math.max(MIN_LINE, S.L - 7 * dt);
+  if (S.pulling) S.L = Math.max(MIN_LINE, S.L - CARGA.puxa * dt);    // puxada: recolhe linha
+}
 const _eul = new THREE.Euler();
 
 /** posição/rotação da pipa presa nas costas de quem está em pos, olhando para yaw */
@@ -314,11 +377,12 @@ export function hangTail(out, attach, yaw, n, t, groundY = 0) {
 const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _l0 = new THREE.Vector3(), _l1 = new THREE.Vector3(), _lq0 = new THREE.Quaternion(), _ba = new THREE.Vector3();
 function placeOnBack() {
   const k = G.kite, P = G.player;
-  backPose(P.g.position, P.yaw, _bp, _bq);
+  // primeira pessoa: a pipa fica segurada na frente da câmera (o lançamento sai dali)
+  if (S.fpHold && G.hooks.kiteHold) G.hooks.kiteHold(_bp, _bq); else backPose(P.g.position, P.yaw, _bp, _bq);
   S.kiteQ.copy(_bq);
   setPos(k.body, _bp); setRot(k.body, _bq); setVel(k.body, ZERO_V);
   if (k.links.length) {
-    _ba.set(0, k.bottom * BACK_SCALE, 0).applyQuaternion(_bq).add(_bp);
+    _ba.set(0, k.bottom * (S.fpHold ? .78 : BACK_SCALE), 0).applyQuaternion(_bq).add(_bp);
     hangTail(k.pts, _ba, P.yaw, k.links.length, S.clock, P.g.position.y);
     k.links.forEach((lb, i) => { setPos(lb, k.pts[i + 1]); setVel(lb, ZERO_V); });
   }
@@ -326,6 +390,7 @@ function placeOnBack() {
 
 /** guarda a pipa nas costas (começo da partida e depois de perder) */
 export function putOnBack() {
+  if (G.kite.links.length < G.kite.kt.tail) buildKite(); // pipa nova: rabiola inteira de novo
   const k = G.kite;
   S.state = 'costas'; S.stateTimer = 0; S.hideKite = false;
   S.theta = 0; S.tension = 0; S.rawT = 0; S.overT = 0; S.stress = 0; S.jerk = 0;
@@ -337,7 +402,7 @@ export function putOnBack() {
 export function launchKite() {
   if (S.state !== 'costas') return false;
   const P = G.player.g.position;
-  S.state = 'lancando'; S.stateTimer = 0;
+  S.state = 'lancando'; S.stateTimer = 0; S.launchFp = !!S.fpHold;
   _l0.copy(S.kitePos); _lq0.copy(S.kiteQ);
   _l1.copy(P).addScaledVector(S.windDirH, 9); _l1.y = P.y + 7;
   lineObj.visible = true;
@@ -369,8 +434,11 @@ export function failKite(kind, msg, sub) {
 
 /* ---------------- vento local (com turbulência das árvores) ---------------- */
 export function windAt(p, out) {
-  const hf = .75 + .25 * smooth(0, 30, p.y);
+  // lá em cima venta mais e com rajadas próprias, que também mudam um pouco a direção
+  const hf = heightWind(p.y) * highGust(p.y, S.clock);
   out.copy(S.windVec).multiplyScalar(hf);
+  const swirl = smooth(25, 120, p.y) * noise1(S.clock * .45 + 7) * .14 * S.windSpeed;
+  out.x += -S.windDirH.z * swirl; out.z += S.windDirH.x * swirl;
   let turb = 0;
   for (const tr of trees) {
     const dx = p.x - tr.x, dz = p.z - tr.z;
@@ -422,6 +490,7 @@ export function kitePhysicsStep(h, strayBodies) {
     _d.subVectors(_p, S.hand);
     const dist = Math.max(.01, _d.length());
     _u.copy(_d).divideScalar(dist);
+    S.kiteVr = _v.dot(_u); // velocidade da pipa se afastando da mão (a linha corre na mão nesse ritmo ao descarregar)
     _f.set(0, 0, 0);
 
     const turb = windAt(_p, _w);
@@ -439,11 +508,14 @@ export function kitePhysicsStep(h, strayBodies) {
 
     // embicar (A/D) e a rabiola/estirante puxando de volta pro prumo
     const steer = S.running ? ((keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0)) : 0;
-    if (steer) S.theta += steer * kt.turn * h * (.25 + .75 * tf);
-    else S.theta -= S.theta * (kt.stab + .6) * h * (.3 + .7 * tf);
+    // pipa de combate: com a linha frouxa ela gira rápido no lugar; esticada, segue pra onde o bico aponta
+    if (steer) S.theta += steer * kt.turn * 1.55 * h * (1.6 - .6 * tf);
+    // rabiola curta (cortada) = pipa mais instável
+    const stab = kt.stab * (kt.tail > 0 ? .45 + .55 * k.links.length / kt.tail : 1);
+    if (!steer) S.theta -= S.theta * (stab * .8 + .45) * h * (.3 + .7 * tf);
     const gustNoise = noise1(S.clock * 1.7) * .35 * (S.windSpeed / 6) * (S.gustAmp / .35);
-    S.theta += (gustNoise + turb * noise1(S.clock * 5 + 7) * 4) / kt.stab * h;
-    if (tf < .15) S.theta += noise1(S.clock * 2.3 + 11) * 3.5 * h;
+    S.theta += (gustNoise + turb * noise1(S.clock * 5 + 7) * 4) / stab * h;
+    if (tf < .15) S.theta += noise1(S.clock * 2.3 + 11) * 4.2 * h; // linha frouxa: a pipa fica "louca" (cabeçada)
     S.theta = wrapAngle(S.theta);
     _nose.copy(_eUp).multiplyScalar(Math.cos(S.theta)).addScaledVector(_eR, Math.sin(S.theta));
 
@@ -459,10 +531,19 @@ export function kitePhysicsStep(h, strayBodies) {
       }
     }
 
-    _f.addScaledVector(_nose, kt.lift * q * q * (.4 + .6 * tf));
+    _f.addScaledVector(_nose, kt.lift * q * q * (.4 + .6 * tf) * FLY.lift);
     _f.addScaledVector(_u, kt.push * q * q * (.4 + .6 * tf));
+    // puxada: a pipa dá um tiro pra onde o bico aponta
+    if (S.pulling && tf > .4 && S.stamina > .02) _f.addScaledVector(_nose, kt.mass * FLY.dart * tf);
+    // descarregando: impulso pra onde o bico aponta e pra cima (a linha está correndo solta)
+    if (S.descarga > 0) {
+      // a energia das puxadas vira velocidade: a pipa sobe e se afasta levando linha
+      const d = S.descarga;
+      _f.y += kt.mass * 6 * Math.max(0, CARGA.vsobe * d - _v.y) + kt.mass * 9.81 * d * .6;
+      _f.addScaledVector(_u, kt.mass * 6 * Math.max(0, CARGA.vsai * d - _v.dot(_u)));
+    }
     _tmp.copy(_v).addScaledVector(_u, -_v.dot(_u));
-    _f.addScaledVector(_tmp, -2 * kt.mass);
+    _f.addScaledVector(_tmp, -FLY.side * kt.mass); // freio de lado: menor = pipa mais rápida e solta
     // linha inextensível: quando esticada, segura tudo que puxa pra fora
     if (dist >= S.L - .02) {
       const Fr = _f.dot(_u) - kt.mass * 9.81 * _u.y;
@@ -558,13 +639,16 @@ function handle(self, other) {
 }
 
 /* ---------------- visual da pipa e da linha do jogador ---------------- */
-const _sag = new THREE.Vector3(), _q = new THREE.Vector3();
+const _kv = new THREE.Vector3();
 export function syncKiteVisual() {
   const k = G.kite;
   getPos(k.body, S.kitePos);
+  S.kiteSpeed = S.state === 'voando' ? getVel(k.body, _kv).length() : 0;
+  if (pieces.length) updatePieces(1 / 60);
   k.mesh.position.copy(S.kitePos);
   k.mesh.quaternion.copy(S.kiteQ);
-  const sc = S.state === 'costas' ? BACK_SCALE : S.state === 'lancando' ? lerp(BACK_SCALE, 1, Math.min(1, S.stateTimer / LAUNCH_TIME)) : 1;
+  const s0 = S.fpHold || S.launchFp ? .78 : BACK_SCALE;
+  const sc = S.state === 'costas' ? s0 : S.state === 'lancando' ? lerp(s0, 1, Math.min(1, S.stateTimer / LAUNCH_TIME)) : 1;
   k.mesh.scale.setScalar(sc);
   lineObj.visible = S.state !== 'costas';
   if (k.kt.tail > 0) {
@@ -574,33 +658,29 @@ export function syncKiteVisual() {
     k.tail.update(k.pts, S.clock, S.windDirH);
   }
 
+}
+
+/**
+ * Desenha a linha do jogador (corda com barriga, tremido e folga). Chamada depois da câmera,
+ * porque em primeira pessoa a linha sai da mão que aparece na tela (S.lineFrom / S.spoolFrom).
+ */
+const myRope = new Corda(LINE_N - 1, 3.7);
+export function updateMyLine(dt) {
   const lp = lineGeo.attributes.position;
+  const from = S.lineFrom || S.hand, spool = S.spoolFrom || S.spoolPos;
   if (S.state === 'arrebentou') {
+    // arrebentou: sobra um pedacinho de linha caindo da mão
     for (let i = 0; i <= LINE_N; i++) {
       const t = i / LINE_N;
-      lp.setXYZ(i, S.hand.x + S.windDirH.x * t * 3, S.hand.y - t * 1.2 - Math.sin(t * 3) * .2, S.hand.z + S.windDirH.z * t * 3);
+      lp.setXYZ(i, from.x + S.windDirH.x * t * 3, from.y - t * 1.2 - Math.sin(t * 3) * .2, from.z + S.windDirH.z * t * 3);
     }
-  } else {
-    lp.setXYZ(0, S.spoolPos.x, S.spoolPos.y, S.spoolPos.z);
-    if (S.duelX) {
-      // enroscada: a linha faz um "bico" no ponto onde cruzou com a outra
-      const half = Math.floor(LINE_N / 2);
-      for (let i = 1; i <= LINE_N; i++) {
-        if (i <= half) { const t = (i - 1) / (half - 1); _q.lerpVectors(S.hand, S.duelX, t); }
-        else { const t = (i - half) / (LINE_N - half); _q.lerpVectors(S.duelX, S.kitePos, t); }
-        lp.setXYZ(i, _q.x, _q.y, _q.z);
-      }
-    } else {
-      const dist = S.hand.distanceTo(S.kitePos);
-      const slack = Math.max(0, S.L - dist);
-      const sagAmt = Math.min(dist * .6, dist * .012 + slack * .7 + (S.tension < .5 ? dist * .05 : 0));
-      _sag.set(0, -sagAmt, 0).addScaledVector(S.windDirH, sagAmt * .3);
-      for (let i = 1; i <= LINE_N; i++) {
-        const t = (i - 1) / (LINE_N - 1);
-        _q.lerpVectors(S.hand, S.kitePos, t).addScaledVector(_sag, 4 * t * (1 - t));
-        lp.setXYZ(i, _q.x, _q.y, _q.z);
-      }
-    }
+    lp.needsUpdate = true;
+    myRope.reset();
+    return;
   }
-  lp.needsUpdate = true;
+  if (!lineObj.visible) { myRope.reset(); return; }
+  lp.setXYZ(0, spool.x, spool.y, spool.z);
+  const L = S.state === 'voando' ? S.L : from.distanceTo(S.kitePos) + 1;
+  myRope.update(dt, from, S.kitePos, L, S.windDirH, S.windSpeed, S.clock, { pin: S.duelX, giving: !!keys.KeyS && S.state === 'voando' });
+  myRope.write(lp, 1);
 }

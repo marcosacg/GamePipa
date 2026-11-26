@@ -6,6 +6,9 @@ import { scene, makeLabel, groundH } from './scene.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry } from './player.js';
 import { makeKiteMesh, TailRenderer, proceduralTail, backPose, hangTail, BACK_SCALE, pinTail } from './kite.js';
 import { DUEL } from './shared/duel.js';
+import { strayTrail } from './shared/linha.js';
+import { Corda } from './corda.js';
+import { noise1 } from './shared/wind.js';
 
 const LN = 30;
 const V = a => new THREE.Vector3(a[0], a[1], a[2]);
@@ -32,6 +35,7 @@ export class RemoteView {
     this.tail = new TailRenderer(type, meta.kite.pat, this.nTail);
     this.tailPts = [];
     this.line = makeLine();
+    this.rope = new Corda(LN, id.length * 7.3);
     this.label = makeLabel(meta.name);
     this.kiteLabel = makeLabel(meta.name, '#ffd166');
     scene.add(this.label, this.kiteLabel);
@@ -53,7 +57,12 @@ export class RemoteView {
     this.tQ.set(s.q[0], s.q[1], s.q[2], s.q[3]);
     if (this.tQ.lengthSq() < .5) this.tQ.set(0, 0, 0, 1);
     this.tQ.normalize();
-    this.tYaw = s.yaw; this.mv = s.mv; this.L = s.L; this.st = s.st;
+    this.tYaw = s.yaw; this.mv = s.mv; this.L = s.L; this.st = s.st; this.give = s.give;
+    // rabiola cortada (fica curta) ou pipa nova (inteira de novo)
+    if (Number.isInteger(s.n)) {
+      const n = Math.min(10, KITES[this.type].tail, Math.max(1, s.n));
+      if (n !== this.nTail && KITES[this.type].tail > 0) { this.tail.dispose(); this.nTail = n; this.tail = new TailRenderer(this.type, this.meta.kite.pat, n); this.tailPts = []; }
+    }
     if (this.first) { this.pos.copy(this.tPos); this.hand.copy(this.tHand); this.k.copy(this.tK); this.q.copy(this.tQ); this.yaw = this.tYaw; this.first = false; }
   }
   update(dt, t, windDirH, duelX, tailPull = null, tailF = 1) {
@@ -96,23 +105,12 @@ export class RemoteView {
     const lp = this.line.geometry.attributes.position;
     if (lost) {
       for (let i = 0; i <= LN; i++) { const s = i / LN; lp.setXYZ(i, this.hand.x + windDirH.x * s * 3, this.hand.y - s * 1.2, this.hand.z + windDirH.z * s * 3); }
-    } else if (duelX) {
-      const half = LN / 2;
-      for (let i = 0; i <= LN; i++) {
-        if (i <= half) this._b.lerpVectors(this.hand, duelX, i / half); else this._b.lerpVectors(duelX, this.k, (i - half) / half);
-        lp.setXYZ(i, this._b.x, this._b.y, this._b.z);
-      }
-    } else {
-      const dist = this.hand.distanceTo(this.k);
-      const sag = Math.min(dist * .5, dist * .015 + Math.max(0, this.L - dist) * .7);
-      for (let i = 0; i <= LN; i++) {
-        const s = i / LN;
-        this._b.lerpVectors(this.hand, this.k, s);
-        this._b.y -= sag * 4 * s * (1 - s);
-        this._b.addScaledVector(windDirH, sag * .3 * 4 * s * (1 - s));
-        lp.setXYZ(i, this._b.x, this._b.y, this._b.z);
-      }
+    } else if (!back) {
+      // corda com barriga (o mesmo formato que a arena usa) e tremido; na enroscada passa pelo ponto do cruzamento
+      this.rope.update(dt, this.hand, this.k, st === 'voando' ? this.L : this.hand.distanceTo(this.k) + 1, windDirH, this.windSpeed || 6, t, { pin: duelX, giving: !!this.give });
+      this.rope.write(lp, 0);
     }
+    if (lost || back) this.rope.reset();
     lp.needsUpdate = true;
   }
   dispose() {
@@ -125,8 +123,10 @@ export class RemoteView {
 
 /** pipa avoada da disputa (posição vem da arena) */
 export class StrayView {
-  constructor(kite) {
+  /** tl = pedaço de linha que ela vai arrastando (m) */
+  constructor(kite, tl = 0) {
     this.kite = kite; // tipo/estampa (usado quando ela é aparada)
+    this.tl = tl; this.trail = [];
     const type = KITES[kite.type] ? kite.type : 'pipa';
     this.mesh = makeKiteMesh(type, kite.pat || 0);
     this.mesh.scale.setScalar(.9);
@@ -153,10 +153,13 @@ export class StrayView {
     this.mesh.rotateX(-.4);
     this.tag.position.set(p.x, p.y + 1.5 + Math.sin(t * 4 + this.ph) * .15, p.z);
     this.tag.material.opacity = .65 + .35 * Math.sin(t * 6 + this.ph);
+    // linha que ela vai arrastando: o mesmo formato da arena (dá pra aparar encostando nela), balançando
     const l = this.line.geometry.attributes.position;
+    const tl = this.tl > 0 ? this.tl : 12;
+    strayTrail([p.x, p.y, p.z], tl, windDirH.x, windDirH.z, LN, this.trail);
     for (let i = 0; i <= LN; i++) {
-      const s = i / LN * 12;
-      l.setXYZ(i, p.x - windDirH.x * s * .35 + Math.sin(t * 2 + s * .5 + this.ph) * .04 * s, p.y - s * .9, p.z - windDirH.z * s * .35);
+      const q = this.trail[i], s = i / LN, w = s * Math.min(3, tl * .08);
+      l.setXYZ(i, q[0] + windDirH.z * noise1(t * 1.7 - s * 4 + this.ph) * w, q[1] + noise1(t * 2.1 - s * 5 + this.ph + 9) * w * .5, q[2] - windDirH.x * noise1(t * 1.7 - s * 4 + this.ph) * w);
     }
     l.needsUpdate = true;
     if (this.n > 0) {

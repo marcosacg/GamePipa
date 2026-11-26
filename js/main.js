@@ -4,8 +4,9 @@ import { AMMO_BASE, H, KITES } from './config.js';
 import { PH, initPhysics } from './physics.js';
 import { renderer, scene, camera, updateSky, followCamera, SCN, groundH } from './scene.js';
 import { buildWorld, updateEnvironment, setScenario, currentScenario, SCENE_LIST, lastBuild } from './world.js';
-import { buildKite, resetKite, kitePhysicsStep, syncKiteVisual, lastApparent, putOnBack, launchKite } from './kite.js';
-import { updateHUD, $ } from './hud.js';
+import { buildKite, resetKite, kitePhysicsStep, syncKiteVisual, updateMyLine, lastApparent, putOnBack, launchKite } from './kite.js';
+import { updateHUD, $, toast } from './hud.js';
+import { fp, cycleCamera, CAM_NAMES } from './maos.js';
 import { buildMenu, enablePlay, setNetMsg, showScene } from './menu.js';
 import { Snd } from './audio.js';
 import { updateFx } from './fx.js';
@@ -104,6 +105,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyE' && launchKite()) Snd.beep(520, .15, 'triangle', .1);  // soltar a pipa das costas
   if (e.code === 'KeyR' && S.state !== 'lancando') putOnBack();              // guardar a pipa nas costas
   if (e.code === 'KeyH') $('help').classList.toggle('hidden');
+  if (e.code === 'KeyC' && S.running && !e.repeat) { const m = cycleCamera(); toast(CAM_NAMES[m], m === 'terceira' ? '' : 'Arraste para olhar em volta · roda do mouse ou Z: zoom', '', 1.6); }
+  if (e.code === 'KeyZ' && S.running && !e.repeat) fp.zoom = !fp.zoom;
   if (e.code === 'KeyT') advanceClockKey();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
@@ -141,6 +144,7 @@ function frame(now) {
   updateEnvironment(dt, S.clock, S.windDirH, S.windSpeed);
   followCamera();
   updateCamera(dt);
+  updateMyLine(dt);
   updateHUD(dt, cam.yaw);
   updateTouch();
   Snd.update(S.paused, S.windSpeed, lastApparent.v, S.state === 'voando', S.tension);

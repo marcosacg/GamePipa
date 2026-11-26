@@ -16,7 +16,7 @@ export class NetSession {
     this.myId = null; this.label = ''; this.room = '';
     this.wind = DISPUTA_WIND;
     this.others = new Map();
-    this.strays = []; this.duels = []; this.scores = [];
+    this.strays = []; this.duels = []; this.hangs = []; this.scores = [];
     this.round = { state: 'playing', endsAt: 0 };
     this.events = [];
     this.rtOffset = 0; this.synced = false;
@@ -63,7 +63,7 @@ export class NetSession {
         case 'snap':
           this.sync(m.rt);
           for (const p of m.p) { if (p.id === this.myId) continue; const o = this.others.get(p.id); if (o) o.state = p; }
-          this.strays = m.s; this.duels = m.d;
+          this.strays = m.s; this.duels = m.d; this.hangs = m.hg || [];
           if (m.sc) this.scores = m.sc;
           if (this.onTick) this.onTick();
           break;

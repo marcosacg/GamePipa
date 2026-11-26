@@ -7,7 +7,7 @@ import { clamp, lerp, rand, lerpAngle, segDist } from './utils.js';
 import { windState } from './shared/wind.js';
 import { PH, makeBody, removeBody, getPos, getVel, setPos, setVel, force, UP } from './physics.js';
 import { scene, camera, renderer, groundH, trees, SCN, collideWalk } from './scene.js';
-import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail } from './kite.js';
+import { makeKiteMesh, buildKite, resetKite, windAt, failKite, lineObj, putOnBack, isFail, cutTail, lineControl } from './kite.js';
 import { makeCharacter, disposeCharacter, poseCharacter, poseAngry, lineHand } from './player.js';
 import { RemoteView, StrayView } from './remote.js';
 import { Snd } from './audio.js';
@@ -17,6 +17,8 @@ import { RESPAWN } from './config.js';
 import { Ads } from './platform.js';
 import { startAparada, clearAparadas } from './aparada.js';
 import { DUEL } from './shared/duel.js';
+import { fp, updateCam1, leaveCam1, dragLook, resetLook, updateCamHud } from './maos.js';
+import { lineShape, strayTrail, polyPoly, pointPoly } from './shared/linha.js';
 
 /* =========================================================
    Vento
@@ -125,6 +127,16 @@ export function updatePlayer(dt) {
 
 export function updateCamera(dt) {
   const pos = G.player.g.position, kp = S.kitePos;
+  // câmeras novas (primeira pessoa / ombro)
+  if (S.running && fp.mode !== 'terceira') {
+    cam.yaw = updateCam1(dt, cam.shake);
+    if (cam.shake > 0) cam.shake = Math.max(0, cam.shake - dt);
+    cam.fovS = camera.fov;
+    updateCamHud();
+    return;
+  }
+  leaveCam1();
+  updateCamHud();
   if (!S.running) {
     if (camera.fov !== 62) { camera.fov = 62; camera.updateProjectionMatrix(); cam.fovS = 62; }
     cam.orbit += dt * .06;
@@ -220,16 +232,21 @@ renderer.domElement.addEventListener('pointermove', e => {
     return;
   }
   const k = e.pointerType === 'touch' ? 1.6 : 1;
+  if (fp.mode !== 'terceira') { dragLook(dx, dy, k); return; }
   cam.yawOff = clamp(cam.yawOff - dx * .004 * k, -1.4, 1.4);
   cam.pitch = clamp(cam.pitch + dy * .003 * k, -.02, .7);
 });
-renderer.domElement.addEventListener('wheel', e => { cam.dist = clamp(cam.dist + Math.sign(e.deltaY) * .7, 3.5, 16); }, { passive: true });
-renderer.domElement.addEventListener('dblclick', () => { cam.yawOff = 0; cam.pitch = .14; });
+renderer.domElement.addEventListener('wheel', e => {
+  if (S.running && fp.mode !== 'terceira') { fp.zoom = e.deltaY < 0; return; } // nas câmeras novas a roda dá zoom
+  cam.dist = clamp(cam.dist + Math.sign(e.deltaY) * .7, 3.5, 16);
+}, { passive: true });
+renderer.domElement.addEventListener('dblclick', () => { cam.yawOff = 0; cam.pitch = .14; resetLook(); });
 
 /* =========================================================
    Falhas da pipa
    ========================================================= */
 G.hooks.onFail = (kind, msg, sub) => {
+  S.cortes = 0; // perdeu a pipa: a sequência de cortes zera
   if (kind !== 'lacada') { toast(msg, sub, 'bad', 2.4); Snd.fail(); }
   const m = curMission();
   if (m && !S.missionDone && (m.type === 'linha' || m.type === 'ventania')) S.mp = 0;
@@ -258,6 +275,7 @@ function spawnRing(minH = 0) {
 function clearRings() { for (const r of S.rings) scene.remove(r.g); S.rings.length = 0; }
 
 const KT = Object.keys(KITES);
+const _myPoly = [], _trail = [], _ha = [], _ka = [], _sa = [];
 /** a minha linha, enquanto a pipa está voando (a aparada fica pendurada nela) */
 const myLine = () => (S.running && S.state === 'voando' && lineObj.visible ? lineObj : null);
 /** a linha de um jogador (eu ou outro), para pendurar a pipa aparada */
@@ -276,40 +294,61 @@ function duelAparada(ss, e, me) {
   const lv = G.remotes.get(e.loser);
   if (lv) lv.markLost();                       // a pipa dele some do céu (agora está pendurada)
   const won = e.winner === me, lost = e.loser === me;
-  if (lost) failKite('lacada');                // a minha some e vou para a espera
+  if (won) S.cortes = (S.cortes || 0) + 1;
+  if (lost) { S.cortes = 0; failKite('lacada'); }                // a minha some e vou para a espera
   if (won || lost) { cam.shake = .5; flashDuel(); Snd.tangle(); }
   if (e.x) burst(new THREE.Vector3().fromArray(e.x), '#ffffff', 'PEGOU NA RABIOLA!');
-  const kite = e.kite || { type: 'pipa', pat: 0 };
-  const from = e.k ? new THREE.Vector3().fromArray(e.k) : new THREE.Vector3().fromArray(e.x || [0, 20, 0]);
-  const wName = ss.nameOf(e.winner), lName = ss.nameOf(e.loser);
-  startAparada({
-    kite, from, line: lineOf(ss, e.winner, me),
+  // a pipa dele fica pendurada na linha de quem ganhou: quem desenha é o evento 'hang' da arena
+}
+
+/* ---------- pipas aparadas penduradas (a arena decide; aqui só o desenho e os avisos) ---------- */
+const V3 = a => new THREE.Vector3().fromArray(a);
+function hangView(ss, h, me, e = null) {
+  if (G.hangViews.has(h.id)) return;
+  const mine = h.by === me, who = ss.nameOf(h.by), owner = e && e.owner ? ss.nameOf(e.owner) : '';
+  const why = e ? e.why : 'catch';
+  const v = startAparada({
+    kite: h.kite || { type: 'pipa', pat: 0 }, from: e && e.from ? V3(e.from) : null, f0: h.f,
+    line: lineOf(ss, h.by, me), persist: true,
+    getF: () => { const x = (ss.hangs || []).find(q => q.id === h.id); return x ? x.f : null; },
     onArrive: p => {
-      if (!S.running || G.session !== ss) return;
-      burst(p.setY(p.y + .8), '#06d6a0', won ? 'APAROU! +150' : wName + ' aparou');
-      if (won) { toast('Aparou a pipa de ' + lName + '!', 'Pegou na rabiola e na linha · +150', 'good', 2.6); Snd.win(); Snd.ring(1.5); }
-      else if (lost) { toast(wName + ' aparou sua pipa!', 'Sua rabiola enroscou na linha dele', 'bad', 2.6); Snd.fail(); }
-      else toast(wName + ' aparou a pipa de ' + lName, '', '', 1.8);
+      if (!S.running || G.session !== ss || !e) return;
+      if (why === 'aparada') {
+        burst(p.setY(p.y + .8), '#06d6a0', mine ? 'APAROU! +150' : who + ' aparou');
+        if (mine) { toast('Aparou a pipa de ' + owner + '!', 'Traga até a mão (Espaço) · puxada rápida corta a rabiola', 'good', 3); Snd.win(); Snd.ring(1.5); }
+        else if (e.owner === me) { toast(who + ' aparou sua pipa!', 'Passe a sua linha na pipa pendurada pra cortar a rabiola', 'bad', 2.6); Snd.fail(); }
+        else toast(who + ' aparou a pipa de ' + owner, '', '', 1.8);
+      } else {
+        burst(p.setY(p.y + .8), '#06d6a0', mine ? 'APAROU! +50' : who + ' aparou');
+        if (mine) { toast('Aparou!', (e.pelaLinha ? 'Pegou pela linha · ' : '') + '+50 · traga até a mão (Espaço)', 'good', 2); Snd.ring(); }
+        else toast(who + ' aparou uma avoada', '', '', 1.4);
+      }
     },
   });
+  G.hangViews.set(h.id, v);
 }
-function spawnStray() {
+function hangEnd(id) { const v = G.hangViews.get(id); if (v) { v.remove(); G.hangViews.delete(id); } }
+/** avoada nova (vem de longe), ou em "at" com a pipa "kite" (aparada que soltou) */
+function spawnStray(at = null, kiteIn = null) {
   const A = PH.A, P = G.player.g.position;
   const side = new THREE.Vector3(-S.windDirH.z, 0, S.windDirH.x);
-  const p = new THREE.Vector3().copy(P).addScaledVector(S.windDirH, -55).addScaledVector(side, rand(-22, 22));
-  p.y = Math.max(P.y + rand(26, 46), groundH(p.x, p.z) + 18);
-  const type = KT[Math.floor(Math.random() * KT.length)];
-  const pat = Math.floor(Math.random() * getPatterns(type).length);
+  const p = at ? at.clone() : new THREE.Vector3().copy(P).addScaledVector(S.windDirH, -55).addScaledVector(side, rand(-22, 22));
+  if (!at) p.y = Math.max(P.y + rand(26, 46), groundH(p.x, p.z) + 18);
+  const type = kiteIn ? kiteIn.type : KT[Math.floor(Math.random() * KT.length)];
+  const pat = kiteIn ? kiteIn.pat : Math.floor(Math.random() * getPatterns(type).length);
   const st = { age: 0, ph: Math.random() * 10, caught: false, catchT: 0, stuck: false, stuckT: 0, dead: false, offset: new THREE.Vector3() };
   st.body = makeBody(new A.btBoxShape(new A.btVector3(.35, .45, .05)), .2, p, null, G_STRAY, G_GROUND | G_STATIC, { type: 'stray', ref: st });
   st.body.setGravity(new A.btVector3(0, 0, 0));
   st.body.setDamping(.1, .9); st.body.setActivationState(4);
   st.body.setAngularFactor(new A.btVector3(0, 0, 0));
   st.kite = { type, pat };
-  st.view = new StrayView(st.kite);
+  st.tl = rand(10, 25); // pedaço de linha que ela vem arrastando
+  st.view = new StrayView(st.kite, st.tl);
+  if (at) st.noCatch = 3; // a que acabou de soltar não gruda de novo na hora
   S.strays.push(st);
-  toast('Pipa avoada!', 'Vem vindo do alto, pelas costas. Apare com a linha!', 'good', 2.2);
+  if (!at) toast('Pipa avoada!', 'Vem vindo do alto, pelas costas. Apare com a linha!', 'good', 2.2);
 }
+G.hooks.spawnStrayAt = (p, kite) => spawnStray(p, kite); // usado nos testes
 function removeStray(st) { removeBody(st.body); st.view.dispose(); }
 function clearStrays() { for (const s of S.strays) removeStray(s); S.strays.length = 0; }
 
@@ -356,11 +395,8 @@ function completeMission() {
 export function updateLogic(dt) {
   const kp = S.kitePos;
   if (S.running && S.state === 'voando') {
-    S.pulling = !!keys.KeyW;
-    if (keys.KeyS) S.L = Math.min(MAX_LINE, S.L + Math.min(6, .8 + S.rawT * 1.5) * dt); // a linha corre na mão conforme a pipa puxa
-    if (keys.Space) S.L = Math.max(MIN_LINE, S.L - 7 * dt);
-    if (S.pulling) S.L = Math.max(MIN_LINE, S.L - 3.2 * dt);
-  } else S.pulling = false;
+    lineControl(dt); // W puxa (enche a carga), S dá linha (descarrega), Espaço recolhe
+  } else { S.pulling = false; S.descarga = 0; }
   S.stamina = S.pulling ? Math.max(0, S.stamina - .4 * dt) : Math.min(1, S.stamina + .25 * dt);
   // sacudida: trocar A/D rápido (vale para soltar a rabiola presa)
   const steer = S.running ? (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) : 0;
@@ -422,17 +458,29 @@ export function updateLogic(dt) {
     getPos(st.body, _tmp);
     st.view.set([_tmp.x, _tmp.y, _tmp.z]);
     st.view.update(dt, S.clock, S.windDirH);
-    if (S.state === 'voando' && (segDist(_tmp, S.hand, kp) < 1.7 || _tmp.distanceTo(kp) < 2.6)) {
+    // apara encostando a linha na avoada, na linha que ela arrasta, ou batendo a pipa nela
+    let pega = false;
+    if (st.noCatch > 0) st.noCatch -= dt;
+    else if (S.state === 'voando') {
+      const poly = lineShape(S.hand.toArray(_ha), kp.toArray(_ka), S.L, S.windDirH.x, S.windDirH.z, 10, _myPoly);
+      const sp = _tmp.toArray(_sa);
+      pega = pointPoly(sp, poly).d < 1.7 || _tmp.distanceTo(kp) < 2.6 || polyPoly(strayTrail(sp, st.tl, S.windDirH.x, S.windDirH.z, 6, _trail), poly, 3).d < 1.3;
+    }
+    if (pega) {
       // encostou: a avoada gruda na minha linha e fica pendurada 6 s; depois vem o aviso e os pontos
       const kite = st.kite, from = _tmp.clone();
       removeStray(st); S.strays.splice(i, 1);
       Snd.beep(660, .12, 'triangle', .15);
       startAparada({
-        kite, from, line: myLine,
+        kite, from, line: myLine, persist: true,
+        reel: () => !!keys.Space && S.state === 'voando',
+        rip: () => (S.pulling && S.stamina > .02 ? Math.max(0, (S.kiteSpeed || 0) - DUEL.rapida) : 0),
+        onHome: p => { if (!S.running) return; S.score += 50; burst(p.setY(p.y + 1), '#06d6a0', 'GUARDOU! +50'); toast('Pipa guardada!', 'Trouxe a aparada até a mão · +50', 'good', 2); Snd.ring(1.6); },
+        onCut: p => { if (!S.running) return; burst(p, '#e63946', 'RABIOLA CORTOU!', true); toast('Puxou rápido demais!', 'A rabiola cortou e a aparada saiu avoada: apare de novo!', 'bad', 2.4); spawnStray(p, kite); },
         onArrive: p => {
           if (!S.running) return;
           burst(p.setY(p.y + .8), '#06d6a0', 'APAROU! +150');
-          S.score += 150; toast('Aparou!', 'Pipa nova pra coleção. +150', 'good', 1.8); Snd.ring(); Snd.ring(1.5);
+          S.score += 150; toast('Aparou!', 'Traga até a mão (Espaço) · puxada rápida corta a rabiola · +150', 'good', 2.4); Snd.ring(); Snd.ring(1.5);
           const mm = curMission();
           if (mm && !S.missionDone && mm.type === 'aparar') { S.mp++; if (S.mp >= mm.goal) completeMission(); }
         },
@@ -457,7 +505,7 @@ function localNetState() {
     pos: [r(p.x), r(p.y), r(p.z)], yaw: r(P.yaw), mv: r(P.vel.length()),
     hand: [r(h.x), r(h.y), r(h.z)], k: [r(k.x), r(k.y), r(k.z)], q: [q.x, q.y, q.z, q.w].map(v => Math.round(v * 1000) / 1000),
     L: r(S.L), T: r(S.tension), breakN: G.kite.kt.breakN, st: S.hideKite ? 'arrebentou' : S.state,
-    flying: S.state === 'voando', pull: S.pulling, give: !!keys.KeyS && S.state === 'voando', sta: r(S.stamina),
+    flying: S.state === 'voando', pull: S.pulling, give: !!keys.KeyS && S.state === 'voando', reel: !!keys.Space && S.state === 'voando', sta: r(S.stamina),
     n: G.kite.links.length, shake: S.shakeT > 0,
     te: G.kite.links.length ? (() => { const e = G.kite.pts[G.kite.pts.length - 1]; return [r(e.x), r(e.y), r(e.z)]; })() : null,
   };
@@ -485,6 +533,7 @@ function updateDisputa(dt) {
     const d = ss.duels.find(x => x.a === id || x.b === id);
     const victim = d && d.kind === 'rabiola' && d.att !== id;
     // quem teve a rabiola presa: linha reta, rabiola puxada; os outros: linha dobrada no ponto
+    v.windSpeed = S.windSpeed;
     v.update(dt, t, S.windDirH, d && !victim ? _dx.fromArray(d.x).clone() : null, victim ? _dx.fromArray(d.x).clone() : null, d ? (d.f || 0) : 1);
   }
 
@@ -493,11 +542,14 @@ function updateDisputa(dt) {
   for (const s of ss.strays) {
     seen.add(s.id);
     let v = G.strayViews.get(s.id);
-    if (!v) { v = new StrayView(s.kite); G.strayViews.set(s.id, v); }
+    if (!v) { v = new StrayView(s.kite, s.tl || 0); G.strayViews.set(s.id, v); }
     v.set(s.p);
     v.update(dt, t, S.windDirH);
   }
   for (const [id, v] of G.strayViews) if (!seen.has(id)) { v.dispose(); G.strayViews.delete(id); }
+  const hs = new Set();
+  for (const h of ss.hangs || []) { hs.add(h.id); hangView(ss, h, ss.myId); }
+  for (const [id, v] of G.hangViews) if (!hs.has(id) && v.t > 1.5) hangEnd(id);
 
   // animação: rabiola enrolada na linha de quem pegou
   for (const d of ss.duels) {
@@ -559,11 +611,11 @@ function handleEvent(ss, e) {
       const lv = G.remotes.get(e.loser);
       if (lv) lv.markLost(); // na tela de todo mundo a pipa dele some e ele fica bravo na hora
       if (e.winner === me || e.loser === me) cam.shake = .5;
-      if (e.winner === me) { toast('Laçou a pipa de ' + ss.nameOf(e.loser) + '!', '+100 · ela virou avoada', 'good', 2.4); Snd.win(); }
+      if (e.winner === me) { S.cortes = (S.cortes || 0) + 1; toast('Cortou a pipa de ' + ss.nameOf(e.loser) + '!', '+100 · ela virou avoada' + (S.cortes > 1 ? ' · ' + S.cortes + ' seguidas' : ''), 'good', 2.4); Snd.win(); }
       else if (e.loser === me) {
-        toast(ss.nameOf(e.winner) + ' levou a melhor!', 'Sua linha arrebentou na enroscada', 'bad', 2.6); Snd.fail();
-        failKite('lacada');
-      } else toast(ss.nameOf(e.winner) + ' laçou ' + ss.nameOf(e.loser), '', '', 1.6);
+        toast(ss.nameOf(e.winner) + ' cortou sua linha!', 'Ele mexeu a linha mais rápido (puxada ou relo)', 'bad', 2.6); Snd.fail();
+        S.cortes = 0; failKite('lacada');
+      } else toast(ss.nameOf(e.winner) + ' cortou ' + ss.nameOf(e.loser), '', '', 1.6);
       break;
     }
     case 'danger':
@@ -587,19 +639,36 @@ function handleEvent(ss, e) {
       const sv = G.strayViews.get(e.id);
       const kite = e.kite || (sv && sv.kite) || { type: 'pipa', pat: 0 };
       if (sv) { sv.dispose(); G.strayViews.delete(e.id); }
-      const mine = e.by === me, who = e.by;
-      const line = lineOf(ss, who, me);
-      const from = e.p ? new THREE.Vector3().fromArray(e.p) : (mine ? S.kitePos.clone() : new THREE.Vector3());
-      if (mine) Snd.beep(660, .12, 'triangle', .15);
-      startAparada({
-        kite, from, line,
-        onArrive: p => {
-          if (!S.running || G.session !== ss) return;
-          burst(p.setY(p.y + .8), '#06d6a0', mine ? 'APAROU! +50' : ss.nameOf(who) + ' aparou');
-          if (mine) { toast('Aparou!', '+50', 'good', 1.5); Snd.ring(); }
-          else toast(ss.nameOf(who) + ' aparou uma avoada', '', '', 1.4);
-        },
-      });
+      if (e.by === me) Snd.beep(660, .12, 'triangle', .15);
+      G.lastCatch = e; // o 'hang' que vem logo depois usa (pegou pela linha?)
+      break;
+    }
+    case 'hang': hangView(ss, e, me, { ...e, pelaLinha: G.lastCatch && G.lastCatch.by === e.by && G.lastCatch.pelaLinha }); break;
+    case 'hangCut': {
+      hangEnd(e.id);
+      const p = V3(e.p);
+      if (e.why === 'puxada') {
+        burst(p, '#e63946', 'RABIOLA CORTOU!', true);
+        if (e.holder === me) { toast('Puxou rápido demais!', 'A rabiola cortou e a aparada saiu avoada', 'bad', 2.4); Snd.fail(); }
+        else toast(ss.nameOf(e.holder) + ' puxou rápido e perdeu a aparada', 'Ela saiu avoada: apare!', '', 1.8);
+      } else if (e.why === 'linha') {
+        burst(p, '#ffd166', 'CORTOU A RABIOLA!', true);
+        if (e.by === me) { toast('Cortou a rabiola da aparada de ' + ss.nameOf(e.holder) + '!', 'Ela saiu avoada: apare!', 'good', 2.2); Snd.win(); }
+        else if (e.holder === me) { toast(ss.nameOf(e.by) + ' cortou a rabiola da sua aparada!', 'Ela saiu avoada', 'bad', 2.2); Snd.fail(); }
+      } else if (e.holder === me) toast('A aparada soltou!', 'Sua linha caiu antes dela chegar', 'bad', 1.8);
+      break;
+    }
+    case 'hangHome':
+      hangEnd(e.id);
+      if (e.by === me) { burst(S.hand.clone().setY(S.hand.y + 1), '#06d6a0', 'GUARDOU! +50'); toast('Pipa guardada!', 'Trouxe a aparada até a mão · +50', 'good', 2); Snd.ring(); Snd.ring(1.6); }
+      break;
+    case 'tailCut': {
+      const p = e.x ? V3(e.x) : null;
+      if (p) burst(p, '#ffd166', 'RABIOLA CORTADA!', true);
+      if (e.vic === me) {
+        cutTail(e.f || .5);
+        toast('Sua rabiola foi cortada!', 'Escapou, mas a pipa ficou mais solta até a próxima', e.by === me ? '' : 'bad', 2.4);
+      } else if (e.att === me || e.by === me) toast('A rabiola de ' + ss.nameOf(e.vic) + ' cortou', 'Puxada rápida corta a rabiola presa', '', 2);
       break;
     }
     case 'strayIn': toast('Pipa avoada no céu!', 'Encoste a linha nela', 'good', 1.8); break;
@@ -626,6 +695,7 @@ function clearDisputa() {
   clearFx();
   for (const v of G.remotes.values()) v.dispose(); G.remotes.clear();
   for (const v of G.strayViews.values()) v.dispose(); G.strayViews.clear();
+  for (const v of G.hangViews.values()) v.remove(); G.hangViews.clear();
   if (G.session) G.session.close();
   if (G.session && G.session.room) Ads.room(null);
   G.session = null; S.duelX = null;
@@ -640,6 +710,7 @@ export function startGame(mode, session = null) {
   S.mode = mode;
   S.pauseOpen = false; S.paused = false;
   G.session = session;
+  S.cortes = 0;
   S.score = 0; S.scoreFrac = 0; S.mi = 0; S.mp = 0; S.missionDone = false; S.ended = false; S.stamina = 1;
   S.minutes = mode === 'desafios' ? 16 * 60 : mode === 'livre' ? 16.5 * 60 : 17.2 * 60;
   const P = G.player;

@@ -6,7 +6,7 @@ export const AMMO_BASE = 'vendor/ammo/'; // bibliotecas locais (pasta vendor/, v
 
 export const H = 1 / 120;                 // passo fixo da física
 export const RESPAWN = 2;                 // segundos até soltar uma pipa nova depois de perder
-export const MAX_LINE = 150, MIN_LINE = 4;
+export const MAX_LINE = 300, MIN_LINE = 4;
 /* resistência da linha: arrebenta quando a tensão MÉDIA passa de breakN × LINE_STRENGTH
    por BREAK_HOLD segundos seguidos (trancos rápidos de rajada não arrebentam) */
 export const LINE_STRENGTH = 1.45;
